@@ -49,6 +49,7 @@ Each player enters a name and picks a fighter (Blaze, Frost, Volt, or Onyx — d
 **Modes**
 - **1 Player vs CPU** — your hand anywhere in the camera view controls your fighter.
 - **2 Players** — stand side by side; the left half of the camera controls P1, the right half controls P2.
+- **Online Match** (web version) — play against a friend anywhere in the world. One player clicks CREATE ROOM and shares the 4-letter code; the other clicks JOIN and types it in. Peer-to-peer over WebRTC (PeerJS) — no game server needed. The room creator's browser runs the match; the joiner uses P1 keys (A/D/W/S/F/G) or hand gestures.
 
 **Keyboard backup** (always active): P1 `A/D` move, `W` jump, `S` block, `F` punch, `G` kick · P2 arrows + `K` punch, `L` kick, `↓` block. `ESC` quits to the menu.
 

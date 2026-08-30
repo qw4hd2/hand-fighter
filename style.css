@@ -116,6 +116,35 @@ body {
 .setup-actions { display: flex; gap: 18px; margin-top: 28px; align-items: center; }
 .fight-btn { font-size: 32px; padding: 14px 60px; }
 
+/* ---------- online lobby ---------- */
+.online-panel { margin-bottom: 22px; }
+#online-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: center; }
+#online-actions .or { opacity: .6; }
+.join-row { display: flex; gap: 10px; }
+#join-code {
+  width: 120px; text-align: center; text-transform: uppercase;
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 26px; letter-spacing: 6px;
+  background: rgba(255, 255, 255, .1);
+  border: 2px solid rgba(255, 255, 255, .3);
+  border-radius: 10px; color: #fff; padding: 8px;
+}
+#room-code-box {
+  margin-top: 24px; padding: 16px 30px;
+  background: rgba(255, 209, 102, .12);
+  border: 2px dashed #ffd166; border-radius: 14px;
+  font-size: 18px; text-align: center;
+}
+#room-code-box b {
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 34px; letter-spacing: 8px; color: #ffd166;
+  margin: 0 8px;
+}
+#room-code-box span { display: block; font-size: 13px; opacity: .75; margin-top: 6px; }
+#room-code-box.hidden { display: none; }
+#online-status { margin-top: 18px; min-height: 24px; color: #ffd166; font-size: 15px; }
+#online-screen .small-btn { margin-top: 20px; }
+
 /* ---------- game ---------- */
 #game-screen { padding: 12px; }
 #game-wrap { position: relative; width: min(96vw, 1280px); }

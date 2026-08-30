@@ -16,6 +16,7 @@
     <div class="menu-buttons">
       <button id="btn-1p" class="big-btn">1 PLAYER <small>vs CPU</small></button>
       <button id="btn-2p" class="big-btn">2 PLAYERS <small>same camera</small></button>
+      <button id="btn-online" class="big-btn">ONLINE MATCH <small>play over the internet</small></button>
     </div>
 
     <div class="help-box">
@@ -56,6 +57,30 @@
     </div>
   </section>
 
+  <!-- ============ ONLINE LOBBY ============ -->
+  <section id="online-screen" class="screen">
+    <h2 class="screen-title">ONLINE MATCH</h2>
+    <div class="setup-panel online-panel">
+      <h3>You</h3>
+      <input id="name-online" type="text" maxlength="14" placeholder="Enter your name" value="Player">
+      <div class="char-cards" id="cards-online"></div>
+    </div>
+    <div id="online-actions">
+      <button id="btn-create" class="big-btn">CREATE ROOM</button>
+      <span class="or">— or —</span>
+      <div class="join-row">
+        <input id="join-code" type="text" maxlength="4" placeholder="CODE" autocomplete="off">
+        <button id="btn-join" class="big-btn">JOIN</button>
+      </div>
+    </div>
+    <div id="room-code-box" class="hidden">
+      Room code: <b id="room-code"></b>
+      <span>send this to your partner — they click JOIN and type it in</span>
+    </div>
+    <div id="online-status"></div>
+    <button id="btn-online-back" class="small-btn">← Back</button>
+  </section>
+
   <!-- ============ GAME ============ -->
   <section id="game-screen" class="screen">
     <div id="game-wrap">
@@ -77,6 +102,7 @@
     </div>
   </section>
 
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

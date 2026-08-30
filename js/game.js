@@ -287,6 +287,8 @@ export class Game {
     this.banner = null;
 
     this.ai = { think: 0, move: 0, punch: false, kick: false, blockT: 0, jump: false };
+    // Latest input received from the remote player (net-host mode).
+    this.remote = { move: 0, block: false, punch: false, kick: false, jump: false };
 
     this.running = true;
     this.lastT = performance.now();
@@ -324,6 +326,13 @@ export class Game {
     });
     this.particles = this.particles.filter(p => p.life > 0);
 
+    // Ghost mode (online guest): state comes from the host via applyState();
+    // locally we only advance animation time.
+    if (this.cfg.mode === 'ghost') {
+      this.f.forEach(f => { f.anim += dt; });
+      return;
+    }
+
     if (this.phase === 'intro') {
       this.f.forEach(f => { f.anim += dt; });
       if (this.phaseT >= 2.0) { this.phase = 'fight'; this.phaseT = 0; sfx.play('bell'); }
@@ -333,7 +342,10 @@ export class Game {
     if (this.phase === 'fight') {
       this.time -= dt;
       const i0 = this.controls.consume(0);
-      const i1 = this.cfg.mode === 'cpu' ? this.aiInput(dt) : this.controls.consume(1);
+      let i1;
+      if (this.cfg.mode === 'cpu') i1 = this.aiInput(dt);
+      else if (this.cfg.mode === 'net-host') i1 = this.consumeRemote();
+      else i1 = this.controls.consume(1);
       this.f[0].update(dt, i0, this.f[1], this);
       this.f[1].update(dt, i1, this.f[0], this);
       this.pushApart();
@@ -420,6 +432,66 @@ export class Game {
         color: colors[(Math.random() * colors.length) | 0],
       });
     }
+  }
+
+  // ---------- online play ----------
+  setRemoteInput(p) {
+    this.remote.move = +p.move || 0;
+    this.remote.block = !!p.block;
+    // Edge-triggered actions accumulate until the next simulated frame.
+    if (p.punch) this.remote.punch = true;
+    if (p.kick) this.remote.kick = true;
+    if (p.jump) this.remote.jump = true;
+  }
+
+  consumeRemote() {
+    const r = { ...this.remote };
+    this.remote.punch = this.remote.kick = this.remote.jump = false;
+    return r;
+  }
+
+  getState() {
+    return {
+      f: this.f.map(f => ({
+        x: Math.round(f.x * 10) / 10, y: Math.round(f.y * 10) / 10,
+        st: f.state, t: Math.round(f.t * 1000) / 1000, fc: f.facing, hp: f.hp,
+      })),
+      time: this.time, phase: this.phase, pt: this.phaseT,
+      wins: this.wins, round: this.round, banner: this.banner,
+    };
+  }
+
+  applyState(s) {
+    if (!s || !s.f) return;
+    s.f.forEach((sf, i) => {
+      const f = this.f[i];
+      if (sf.st !== f.state) {
+        if (sf.st === 'punch' || sf.st === 'kick') sfx.play('whoosh');
+        else if (sf.st === 'jump') sfx.play('jump');
+        else if (sf.st === 'hit') {
+          sfx.play('hit');
+          this.spawnSparks(sf.x + (this.f[1 - i].x - sf.x) * 0.25, FLOOR - sf.y - 100, false);
+          this.shake = 6;
+        } else if (sf.st === 'ko') sfx.play('ko');
+      }
+      f.x = sf.x; f.y = sf.y; f.state = sf.st; f.t = sf.t;
+      f.facing = sf.fc; f.hp = sf.hp;
+    });
+    if (this.phase === 'intro' && s.phase === 'fight') sfx.play('bell');
+    if (s.phase === 'matchend' && this.phase !== 'matchend') {
+      sfx.play('win');
+      if (this.cb.onMatchEnd) this.cb.onMatchEnd();
+    }
+    this.time = s.time; this.phase = s.phase; this.phaseT = s.pt;
+    this.wins = s.wins; this.round = s.round; this.banner = s.banner;
+  }
+
+  statusFor(i) {
+    const m = this.cfg.mode;
+    if (m === 'cpu' && i === 1) return '🤖 CPU';
+    if (m === 'net-host') return i === 0 ? this.controls.status(0) : '🌐 online';
+    if (m === 'ghost') return i === (this.cfg.ownSide ?? 1) ? this.controls.status(0) : '🌐 online';
+    return this.controls.status(i);
   }
 
   // ---------- CPU opponent ----------
@@ -564,8 +636,7 @@ export class Game {
       // input status
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
       ctx.font = '13px Verdana, sans-serif';
-      const status = (this.cfg.mode === 'cpu' && i === 1) ? '🤖 CPU' : this.controls.status(i);
-      ctx.fillText(status, i === 0 ? x + 66 : x + barW - 66, y + barH + 21);
+      ctx.fillText(this.statusFor(i), i === 0 ? x + 66 : x + barW - 66, y + barH + 21);
     }
 
     // timer

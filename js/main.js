@@ -1,18 +1,23 @@
-// App wiring: menu → character select → fight, plus camera lifecycle.
+// App wiring: menu → (character select | online lobby) → fight.
 import { CHARACTERS } from './characters.js';
 import { Game } from './game.js';
 import { Controls } from './input.js';
 import { HandTracker } from './hands.js';
+import { NetSession, genCode } from './net.js';
 import { sfx } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
 
 const state = {
-  mode: 'cpu',            // 'cpu' | '2p'
+  mode: 'cpu',            // 'cpu' | '2p' | 'online'
   chars: [0, 1],          // selected character index per player
   game: null,
   controls: null,
   tracker: null,
+  net: null,
+  netTimer: null,
+  role: null,             // 'host' | 'guest' when online
+  onlineCfg: null,        // cached fight config for online rematches
 };
 
 function showScreen(id) {
@@ -45,7 +50,6 @@ function buildCards(container, player) {
 
 function openSetup(mode) {
   state.mode = mode;
-  const p2Panel = $('panel-p2');
   if (mode === 'cpu') {
     $('panel-p2-title').textContent = 'CPU Opponent';
     $('name-p2').value = 'CPU';
@@ -60,7 +64,35 @@ function openSetup(mode) {
   showScreen('setup-screen');
 }
 
-// ---------- game lifecycle ----------
+// ---------- shared fight helpers ----------
+function startTracker(twoPlayerCam) {
+  state.tracker = new HandTracker({
+    video: $('cam-video'),
+    canvas: $('cam-canvas'),
+    twoPlayer: twoPlayerCam,
+    onStatus: (msg) => { $('cam-status').textContent = msg; },
+    onUpdate: (players) => state.controls && state.controls.updateHands(players),
+  });
+  state.tracker.start().catch((err) => {
+    console.warn('Hand tracking unavailable:', err);
+    $('cam-status').textContent = '📷 camera unavailable — keyboard controls active';
+  });
+}
+
+function stopFight() {
+  if (state.game) { state.game.destroy(); state.game = null; }
+  if (state.controls) { state.controls.destroy(); state.controls = null; }
+  if (state.tracker) { state.tracker.stop(); state.tracker = null; }
+}
+
+function cleanupNet() {
+  if (state.netTimer) { clearInterval(state.netTimer); state.netTimer = null; }
+  if (state.net) { state.net.close(); state.net = null; }
+  state.role = null;
+  state.onlineCfg = null;
+}
+
+// ---------- local fight (1P / same-camera 2P) ----------
 function startFight() {
   sfx.unlock();
   const ch1 = CHARACTERS[state.chars[0]];
@@ -75,36 +107,174 @@ function startFight() {
   $('end-buttons').classList.add('hidden');
 
   state.controls = new Controls(state.mode);
-
-  state.tracker = new HandTracker({
-    video: $('cam-video'),
-    canvas: $('cam-canvas'),
-    twoPlayer: state.mode === '2p',
-    onStatus: (msg) => { $('cam-status').textContent = msg; },
-    onUpdate: (players) => state.controls.updateHands(players),
-  });
-  state.tracker.start().catch((err) => {
-    console.warn('Hand tracking unavailable:', err);
-    $('cam-status').textContent = '📷 camera unavailable — keyboard controls active';
-  });
-
+  startTracker(state.mode === '2p');
   state.game = new Game($('game-canvas'), cfg, state.controls, {
-    onMatchEnd: () => $('end-buttons').classList.remove('hidden'),
+    onMatchEnd: () => showEndButtons(),
   });
 }
 
-function stopFight() {
-  if (state.game) { state.game.destroy(); state.game = null; }
-  if (state.controls) { state.controls.destroy(); state.controls = null; }
-  if (state.tracker) { state.tracker.stop(); state.tracker = null; }
+// ---------- online flow ----------
+function selfInfo() {
+  return { name: $('name-online').value.trim() || 'Player', charId: state.chars[0] };
+}
+
+function sanitizeName(n) {
+  return (typeof n === 'string' && n.trim() ? n.trim() : 'Partner').slice(0, 14);
+}
+
+function charIdx(i) {
+  const n = parseInt(i, 10);
+  return Number.isInteger(n) && n >= 0 && n < CHARACTERS.length ? n : 0;
+}
+
+function openOnline() {
+  sfx.unlock();
+  cleanupNet();
+  buildCards($('cards-online'), 0);
+  $('online-status').textContent = '';
+  $('room-code-box').classList.add('hidden');
+  showScreen('online-screen');
+}
+
+function netHandlers(role) {
+  return {
+    onStatus: (s) => { $('online-status').textContent = s; },
+    onConnected: () => {
+      if (role === 'guest') {
+        state.net.send({ t: 'hello', ...selfInfo() });
+        $('online-status').textContent = 'connected — waiting for host…';
+      } else {
+        $('online-status').textContent = 'partner connected — starting…';
+      }
+    },
+    onData: (d) => handleNetData(role, d),
+    onClose: () => onNetLost(),
+    onError: (e) => {
+      const msg = e && e.type === 'peer-unavailable' ? 'room not found — check the code'
+        : e && e.type === 'unavailable-id' ? 'code already in use — click CREATE ROOM again'
+        : 'connection error — try again';
+      $('online-status').textContent = msg;
+    },
+  };
+}
+
+function handleNetData(role, d) {
+  if (!d || typeof d !== 'object') return;
+  if (role === 'host') {
+    if (d.t === 'hello' && !state.game) {
+      const guest = { name: sanitizeName(d.name), charId: charIdx(d.charId) };
+      state.net.send({ t: 'start', p1: selfInfo(), p2: guest });
+      startOnlineFight('host', selfInfo(), guest);
+    } else if (d.t === 'input' && state.game) {
+      state.game.setRemoteInput(d);
+    }
+  } else {
+    if (d.t === 'start' && !state.game) {
+      startOnlineFight('guest',
+        { name: sanitizeName(d.p1 && d.p1.name), charId: charIdx(d.p1 && d.p1.charId) },
+        { name: sanitizeName(d.p2 && d.p2.name), charId: charIdx(d.p2 && d.p2.charId) });
+    } else if (d.t === 'state' && state.game) {
+      state.game.applyState(d.s);
+    } else if (d.t === 'rematch' && state.game) {
+      recreateOnlineGame();
+    }
+  }
+}
+
+function startOnlineFight(role, p1Info, p2Info) {
+  state.role = role;
+  const mk = (info) => ({ name: info.name, ch: CHARACTERS[info.charId] });
+  state.onlineCfg = role === 'host'
+    ? { mode: 'net-host', p1: mk(p1Info), p2: mk(p2Info) }
+    : { mode: 'ghost', ownSide: 1, p1: mk(p1Info), p2: mk(p2Info) };
+
+  showScreen('game-screen');
+  $('end-buttons').classList.add('hidden');
+  state.controls = new Controls('online');
+  startTracker(false);
+  state.game = new Game($('game-canvas'), state.onlineCfg, state.controls, {
+    onMatchEnd: () => showEndButtons(),
+  });
+
+  if (role === 'host') {
+    state.netTimer = setInterval(() => {
+      if (state.game && state.net) state.net.send({ t: 'state', s: state.game.getState() });
+    }, 33);
+  } else {
+    state.netTimer = setInterval(() => {
+      if (state.controls && state.net) state.net.send({ t: 'input', ...state.controls.consume(0) });
+    }, 33);
+  }
+}
+
+function recreateOnlineGame() {
+  if (!state.onlineCfg) return;
+  if (state.game) state.game.destroy();
+  $('end-buttons').classList.add('hidden');
+  state.game = new Game($('game-canvas'), state.onlineCfg, state.controls, {
+    onMatchEnd: () => showEndButtons(),
+  });
+}
+
+function onNetLost() {
+  const wasOnline = !!state.net;
+  cleanupNet();
+  if (!wasOnline) return;
+  stopFight();
+  openOnline();
+  $('online-status').textContent = 'partner disconnected';
+}
+
+function showEndButtons() {
+  $('end-buttons').classList.remove('hidden');
+  const online = !!state.role;
+  // Guests can't restart the match — the host drives it.
+  $('btn-rematch').style.display = state.role === 'guest' ? 'none' : '';
+  $('btn-newfighters').style.display = online ? 'none' : '';
+}
+
+function quitToMenu() {
+  cleanupNet();
+  stopFight();
+  showScreen('menu-screen');
 }
 
 // ---------- buttons ----------
 $('btn-1p').addEventListener('click', () => { sfx.unlock(); openSetup('cpu'); });
 $('btn-2p').addEventListener('click', () => { sfx.unlock(); openSetup('2p'); });
+$('btn-online').addEventListener('click', openOnline);
 $('btn-back').addEventListener('click', () => showScreen('menu-screen'));
 $('btn-fight').addEventListener('click', startFight);
-$('btn-quit').addEventListener('click', () => { stopFight(); showScreen('menu-screen'); });
-$('btn-menu2').addEventListener('click', () => { stopFight(); showScreen('menu-screen'); });
+$('btn-quit').addEventListener('click', quitToMenu);
+$('btn-menu2').addEventListener('click', quitToMenu);
 $('btn-newfighters').addEventListener('click', () => { stopFight(); openSetup(state.mode); });
-$('btn-rematch').addEventListener('click', () => { stopFight(); startFight(); });
+$('btn-rematch').addEventListener('click', () => {
+  if (state.role === 'host') {
+    state.net.send({ t: 'rematch' });
+    recreateOnlineGame();
+  } else {
+    stopFight();
+    startFight();
+  }
+});
+$('btn-online-back').addEventListener('click', () => { cleanupNet(); showScreen('menu-screen'); });
+$('btn-create').addEventListener('click', () => {
+  cleanupNet();
+  const code = genCode();
+  $('room-code').textContent = code;
+  $('room-code-box').classList.remove('hidden');
+  $('online-status').textContent = 'opening room…';
+  state.net = new NetSession(netHandlers('host'));
+  state.net.host(code);
+});
+$('btn-join').addEventListener('click', () => {
+  const code = $('join-code').value.trim().toUpperCase();
+  if (code.length !== 4) {
+    $('online-status').textContent = 'enter the 4-character room code';
+    return;
+  }
+  cleanupNet();
+  $('online-status').textContent = 'connecting…';
+  state.net = new NetSession(netHandlers('guest'));
+  state.net.join(code);
+});
