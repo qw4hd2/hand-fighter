@@ -76,20 +76,23 @@ class SFX:
         try:
             import numpy as np
             self.np = np
-            if not pygame.mixer.get_init():
+            if pygame.mixer.get_init() is None:
                 pygame.mixer.init(frequency=22050, size=-16, channels=1)
-            self.ok = pygame.mixer.get_init() is not None
-            if self.ok:
-                self._build()
-        except Exception:
+            # Adapt synthesis to whatever the mixer actually runs at —
+            # pygame.init() usually pre-opens it as 44.1kHz stereo.
+            self.rate, _size, self.channels = pygame.mixer.get_init()
+            self._build()
+            self.ok = True
+        except Exception as e:
+            print('SFX disabled:', e)
             self.ok = False
 
     def _tone(self, freq, dur, vol=0.3, shape='sine', slide=None, decay=4.0):
         np = self.np
-        n = int(22050 * dur)
+        n = int(self.rate * dur)
         t = np.linspace(0, dur, n, False)
         f = np.linspace(freq, slide if slide else freq, n)
-        phase = np.cumsum(2 * np.pi * f / 22050)
+        phase = np.cumsum(2 * np.pi * f / self.rate)
         if shape == 'square':
             w = np.sign(np.sin(phase))
         elif shape == 'tri':
@@ -100,7 +103,7 @@ class SFX:
 
     def _noise(self, dur, vol=0.2):
         np = self.np
-        n = int(22050 * dur)
+        n = int(self.rate * dur)
         return (np.random.uniform(-1, 1, n)) * vol * np.linspace(1, 0, n)
 
     def _mk(self, *parts):
@@ -110,7 +113,10 @@ class SFX:
         for p in parts:
             mix[:p.size] += p
         mix = np.clip(mix, -1, 1)
-        return pygame.sndarray.make_sound((mix * 32000).astype(np.int16))
+        pcm = (mix * 32000).astype(np.int16)
+        if self.channels > 1:
+            pcm = np.ascontiguousarray(np.repeat(pcm[:, None], self.channels, axis=1))
+        return pygame.sndarray.make_sound(pcm)
 
     def _seq(self, specs):
         """Concatenate tones one after another (for the win jingle)."""
