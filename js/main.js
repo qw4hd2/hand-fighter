@@ -139,6 +139,11 @@ function openOnline() {
 function netHandlers(role) {
   return {
     onStatus: (s) => { $('online-status').textContent = s; },
+    onRoomOpen: (code) => {
+      $('room-code').textContent = code;
+      $('room-code-box').classList.remove('hidden');
+      $('online-status').textContent = 'room open — waiting for your partner…';
+    },
     onConnected: () => {
       if (role === 'guest') {
         state.net.send({ t: 'hello', ...selfInfo() });
@@ -150,8 +155,11 @@ function netHandlers(role) {
     onData: (d) => handleNetData(role, d),
     onClose: () => onNetLost(),
     onError: (e) => {
-      const msg = e && e.type === 'peer-unavailable' ? 'room not found — check the code'
-        : e && e.type === 'unavailable-id' ? 'code already in use — click CREATE ROOM again'
+      const t = e && e.type;
+      const msg = t === 'peer-unavailable' ? 'room not found — double-check the code with your partner'
+        : t === 'unavailable-id' ? 'code already in use — click CREATE ROOM again'
+        : t === 'timeout' ? 'cannot reach the connection server — check your internet and try again'
+        : t === 'ice-failed' ? 'a network is blocking the direct link — try again with one player on a phone hotspot'
         : 'connection error — try again';
       $('online-status').textContent = msg;
     },
@@ -260,20 +268,28 @@ $('btn-rematch').addEventListener('click', () => {
 $('btn-online-back').addEventListener('click', () => { cleanupNet(); showScreen('menu-screen'); });
 $('btn-create').addEventListener('click', () => {
   cleanupNet();
-  const code = genCode();
-  $('room-code').textContent = code;
-  $('room-code-box').classList.remove('hidden');
-  $('online-status').textContent = 'opening room…';
+  $('join-code').value = '';
+  $('room-code-box').classList.add('hidden');
   state.net = new NetSession(netHandlers('host'));
-  state.net.host(code);
+  state.net.host(genCode());
+});
+$('join-code').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/\s+/g, '').toUpperCase();
 });
 $('btn-join').addEventListener('click', () => {
-  const code = $('join-code').value.trim().toUpperCase();
+  const code = $('join-code').value.replace(/\s+/g, '').toUpperCase();
   if (code.length !== 4) {
     $('online-status').textContent = 'enter the 4-character room code';
     return;
   }
+  // Don't let the room creator destroy their own room by "testing" the code —
+  // the JOIN side is for the partner on their own device.
+  if (state.net && state.net.hosting && state.net.code === code && !state.net.connected) {
+    $('online-status').textContent = "that's your own room — your partner types this code on THEIR device";
+    return;
+  }
   cleanupNet();
+  $('room-code-box').classList.add('hidden');
   $('online-status').textContent = 'connecting…';
   state.net = new NetSession(netHandlers('guest'));
   state.net.join(code);
