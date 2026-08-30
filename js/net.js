@@ -5,13 +5,40 @@
 const PREFIX = 'hand-fighter-v1-';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-const RTC_CONFIG = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
-  ],
-};
+// Relay (TURN) service so the game connects even across strict NATs/mobile
+// networks. Fresh credentials are fetched at runtime; if that fails we fall
+// back to the embedded relay credential, then to plain STUN.
+const TURN_CREDS_URL = 'https://handfighter.metered.live/api/v1/turn/credentials?apiKey=f5840f4a4d13a87d6b15a5e07988e9777a68';
+const STUN_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+];
+const FALLBACK_TURN = [
+  {
+    urls: [
+      'turn:global.relay.metered.ca:80',
+      'turn:global.relay.metered.ca:80?transport=tcp',
+      'turn:global.relay.metered.ca:443',
+      'turns:global.relay.metered.ca:443?transport=tcp',
+    ],
+    username: '821879a18cf2b842afad1924',
+    credential: '/hQppehPTZPoPnt3',
+  },
+];
+
+async function fetchIceServers() {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch(TURN_CREDS_URL, { signal: ctl.signal });
+    clearTimeout(t);
+    if (r.ok) {
+      const servers = await r.json();
+      if (Array.isArray(servers) && servers.length) return [...STUN_SERVERS, ...servers];
+    }
+  } catch (e) { console.warn('TURN credential fetch failed, using fallback:', e); }
+  return [...STUN_SERVERS, ...FALLBACK_TURN];
+}
 
 export function genCode() {
   let s = '';
@@ -36,14 +63,17 @@ export class NetSession {
   get hosting() { return this.role === 'host'; }
   get connected() { return !!(this.conn && this.conn.open); }
 
-  host(code) {
+  async host(code) {
     this.role = 'host';
     this.code = code;
-    this.h.onStatus?.('contacting connection server…');
+    this.h.onStatus?.('preparing relay…');
     this._t(() => {
       if (!this.closed && !(this.peer && this.peer.open)) this.h.onError?.({ type: 'timeout' });
-    }, 12000);
-    this.peer = new Peer(PREFIX + code, { config: RTC_CONFIG });
+    }, 15000);
+    const iceServers = await fetchIceServers();
+    if (this.closed) return;
+    this.h.onStatus?.('contacting connection server…');
+    this.peer = new Peer(PREFIX + code, { config: { iceServers } });
     this.peer.on('open', () => { this._clearTimers(); this.h.onRoomOpen?.(code); });
     this.peer.on('connection', (c) => {
       if (this.conn) { c.close(); return; }  // room is full
@@ -55,14 +85,17 @@ export class NetSession {
     this.peer.on('error', (e) => this._err(e));
   }
 
-  join(code) {
+  async join(code) {
     this.role = 'guest';
     this.code = code;
-    this.h.onStatus?.('contacting connection server…');
+    this.h.onStatus?.('preparing relay…');
     this._t(() => {
       if (!this.closed && !(this.peer && this.peer.open)) this.h.onError?.({ type: 'timeout' });
-    }, 12000);
-    this.peer = new Peer({ config: RTC_CONFIG });
+    }, 15000);
+    const iceServers = await fetchIceServers();
+    if (this.closed) return;
+    this.h.onStatus?.('contacting connection server…');
+    this.peer = new Peer({ config: { iceServers } });
     this.peer.on('open', () => this._connect());
     this.peer.on('disconnected', () => {
       if (!this.closed) { try { this.peer.reconnect(); } catch (e) { /* gone */ } }
