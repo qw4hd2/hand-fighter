@@ -28,9 +28,6 @@ if SELFTEST or SHOT_DIR:
 
 import pygame  # noqa: E402  (import after env setup)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, 'assets', 'hand_landmarker.task')
-
 # ---------------------------------------------------------------- constants
 W, H = 1280, 720          # window
 ARENA_H = 620             # fight area height; strip below holds camera/status
@@ -161,61 +158,57 @@ def classify_gesture(lm):
 
 
 class HandTracker(threading.Thread):
-    """Camera + MediaPipe worker. Publishes .players and a small .preview frame."""
+    """MediaPipe worker. The camera is opened on the MAIN thread (macOS shows
+    its permission prompt there) and handed in; this thread only reads frames.
+    Publishes .players and a small .preview frame."""
 
-    def __init__(self, two_player):
+    def __init__(self, two_player, cap=None):
         super().__init__(daemon=True)
         self.two_player = two_player
+        self.cap = cap
         self.players = [None, None]
         self.preview = None       # RGB bytes tuple: (bytes, w, h)
-        self.status = 'starting camera...'
+        self.status = 'starting hand tracking...'
         self.running = True
 
     def stop(self):
         self.running = False
 
     def run(self):
+        cap = self.cap
+        if cap is None:
+            self.status = 'no camera - keyboard only'
+            return
         try:
             import cv2
             import mediapipe as mp
-            from mediapipe.tasks import python as mp_python
-            from mediapipe.tasks.python import vision
         except Exception as e:
             self.status = 'tracking libs failed - keyboard only'
             print('HandTracker import error:', e)
             return
         try:
-            cap = cv2.VideoCapture(0)
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
-            if not cap.isOpened():
-                self.status = 'no camera - keyboard only'
-                return
-            self.status = 'loading hand model...'
-            opts = vision.HandLandmarkerOptions(
-                base_options=mp_python.BaseOptions(model_asset_path=MODEL_PATH),
-                running_mode=vision.RunningMode.VIDEO,
-                num_hands=2,
-            )
-            landmarker = vision.HandLandmarker.create_from_options(opts)
+            hands = mp.solutions.hands.Hands(
+                static_image_mode=False, max_num_hands=2, model_complexity=0,
+                min_detection_confidence=0.5, min_tracking_confidence=0.5)
             self.status = 'camera ready - show your hand'
-            t0 = time.monotonic()
             colors = [(51, 85, 255), (245, 184, 63)]  # BGR per player
+            fails = 0
             while self.running:
                 ok, frame = cap.read()
                 if not ok:
-                    time.sleep(0.02)
+                    fails += 1
+                    if fails > 60:
+                        self.status = ('camera blocked - System Settings > '
+                                       'Privacy & Security > Camera, then restart')
+                    time.sleep(0.03)
                     continue
+                fails = 0
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-                ts = int((time.monotonic() - t0) * 1000)
-                try:
-                    res = landmarker.detect_for_video(mp_img, ts)
-                except Exception:
-                    continue
+                res = hands.process(rgb)
 
                 players = [None, None]
-                for hand in (res.hand_landmarks or []):
+                for hlm in (res.multi_hand_landmarks or []):
+                    hand = hlm.landmark
                     cx = sum(hand[i].x for i in (0, 5, 9, 13, 17)) / 5
                     cy = sum(hand[i].y for i in (0, 5, 9, 13, 17)) / 5
                     mx = 1 - cx
@@ -237,10 +230,15 @@ class HandTracker(threading.Thread):
                                        2, colors[i], -1)
                 pv = cv2.cvtColor(pv, cv2.COLOR_BGR2RGB)
                 self.preview = (pv.tobytes(), 240, 135)
-            cap.release()
+            hands.close()
         except Exception as e:
-            self.status = 'camera failed - keyboard only'
+            self.status = 'hand tracking failed - keyboard only'
             print('HandTracker error:', e)
+        finally:
+            try:
+                cap.release()
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------- input
@@ -1070,6 +1068,29 @@ class App:
                       (255, 255, 255), outline=(27, 16, 38))
 
     # ---------- state transitions
+    def _open_camera(self):
+        """Open the webcam on the MAIN thread. macOS pops its one-time camera
+        permission dialog during this call, and that only works here — doing
+        it on a worker thread fails with 'can not spin main run loop'."""
+        self.screen.fill(hexc('#100d1e'))
+        self.text(self.screen, 'h2', 'STARTING CAMERA...', (W / 2, H / 2 - 30),
+                  (255, 226, 122))
+        self.text(self.screen, 'ui',
+                  'macOS may ask for camera permission - click Allow',
+                  (W / 2, H / 2 + 30), (200, 196, 220))
+        pygame.display.flip()
+        try:
+            import cv2
+            cap = cv2.VideoCapture(0)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+            if cap.isOpened():
+                return cap
+            cap.release()
+        except Exception as e:
+            print('camera open error:', e)
+        return None
+
     def start_fight(self, with_tracker=True):
         cfg = dict(
             mode=self.mode,
@@ -1081,7 +1102,8 @@ class App:
         self.controls = Controls(self.mode)
         self.game = Game(cfg, self.controls, self.sfx)
         if with_tracker:
-            self.tracker = HandTracker(two_player=self.mode == '2p')
+            cap = self._open_camera()
+            self.tracker = HandTracker(two_player=self.mode == '2p', cap=cap)
             self.tracker.start()
         self.state = 'fight'
 
