@@ -24,14 +24,26 @@ function shade(hex, f) {
   return `rgb(${r},${g},${b})`;
 }
 
-// Two-segment limb drawn as a curve with a fake elbow/knee bend.
-function limb(ctx, x1, y1, x2, y2, bend, w, color) {
-  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
-  const ex = mx + (-dy / len) * bend, ey = my + (dx / len) * bend;
-  ctx.strokeStyle = color; ctx.lineWidth = w;
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(ex, ey, x2, y2); ctx.stroke();
+// Two-bone inverse kinematics: given a limb from a to b with segment lengths
+// l1/l2, return the elbow/knee position. side (+1/-1) picks the bend side.
+function ik(a, b, l1, l2, side) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  let dist = Math.hypot(dx, dy) || 0.001;
+  const max = l1 + l2 - 0.5;
+  if (dist > max) dist = max;
+  const cos = clamp((dist * dist + l1 * l1 - l2 * l2) / (2 * dist * l1), -1, 1);
+  const ang = Math.atan2(dy, dx) + Math.acos(cos) * side;
+  return { x: a.x + Math.cos(ang) * l1, y: a.y + Math.sin(ang) * l1 };
+}
+
+function seg(ctx, a, b, w, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+}
+
+function disc(ctx, p, r, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
 }
 
 class Fighter {
@@ -52,6 +64,7 @@ class Fighter {
     this.facing = this.side === 0 ? 1 : -1;
     this.hitDone = false; this.knockV = 0; this.stun = 0;
     this.walkDir = 1;
+    this.dispHp = this.hp; this.ghostHp = this.hp;
   }
 
   get grounded() { return this.y <= 0.001; }
@@ -96,6 +109,7 @@ class Fighter {
         const a = ATTACKS[this.state];
         const ph = this.attackPhase();
         if (ph.active && !this.hitDone) game.tryHit(this, opp, a, this.state);
+        // (kind is passed so kicks freeze the frame slightly longer)
         if (this.t >= a.startup + a.active + a.recovery) this.setState('idle');
         break;
       }
@@ -146,15 +160,21 @@ class Fighter {
   // ---------- rendering ----------
   draw(ctx) {
     const d = this.facing, c = this.ch;
+    const s = c.build || 1;
     const base = FLOOR - this.y;
     const flash = this.state === 'hit' && this.t < 0.1;
-    const col = flash ? '#ffffff' : c.color;
-    const colDark = flash ? '#dddddd' : shade(c.color, 0.55);
-    const skin = flash ? '#ffffff' : c.skin;
+    const F = (col) => flash ? '#ffffff' : col;
+    const skin = F(c.skin), skinD = F(shade(c.skin, 0.72));
+    const pants = F(c.pants), pantsD = F(shade(c.pants, 0.62));
+    const glove = F(c.glove), gloveD = F(shade(c.glove, 0.7));
+    const hair = F(c.hair);
+    const accent = F(c.accent);
+    const torsoCol = c.top ? F(c.top) : skin;
+    const torsoColD = c.top ? F(shade(c.top, 0.72)) : skinD;
 
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    const sw = 46 * Math.max(0.4, 1 - this.y / 300);
+    const sw = 48 * s * Math.max(0.4, 1 - this.y / 300);
     ctx.beginPath(); ctx.ellipse(this.x, FLOOR + 12, sw, 9, 0, 0, Math.PI * 2); ctx.fill();
 
     ctx.save();
@@ -168,103 +188,167 @@ class Fighter {
     // pose parameters
     let lean = 0, crouch = 0, ext = 0;
     if (this.attacking) ext = this.attackPhase().ext;
-    if (this.state === 'punch') lean = d * 8 * ext;
-    if (this.state === 'kick') lean = -d * 12 * ext;
-    if (this.state === 'block') crouch = 8;
-    if (this.state === 'hit') lean = -d * 16;
+    if (this.state === 'punch') lean = d * 10 * ext;
+    if (this.state === 'kick') lean = -d * 14 * ext;
+    if (this.state === 'block') crouch = 10;
+    if (this.state === 'hit') lean = -d * 18;
 
-    const bob = (this.state === 'idle') ? Math.sin(this.anim * 5) * 2.5 : 0;
-    const hip = { x: this.x - d * 2 + lean * 0.4, y: base - 74 + crouch + bob };
-    const sho = { x: this.x + lean, y: base - 126 + crouch * 1.5 + bob };
+    const idleBob = (this.state === 'idle') ? Math.sin(this.anim * 4) * 2.2 : 0;
+    const hip = { x: this.x - d * 2 + lean * 0.35, y: base - 84 * s + crouch + idleBob };
+    const chest = { x: this.x + lean + (this.state === 'punch' ? d * 7 * ext : 0), y: base - 130 * s + crouch * 1.4 + idleBob };
+    const sho = { x: chest.x, y: chest.y + 2 };
 
-    // default guard pose
-    let handF = { x: sho.x + d * 26, y: sho.y + 16 };
-    let handB = { x: sho.x + d * 12, y: sho.y + 24 };
-    let footF = { x: this.x + d * 14, y: base };
-    let footB = { x: this.x - d * 16, y: base };
+    // default fighting stance
+    let handF = { x: sho.x + d * 27 * s, y: sho.y + 15 + idleBob * 0.5 };
+    let handB = { x: sho.x + d * 11 * s, y: sho.y + 23 };
+    let footF = { x: this.x + d * 17 * s, y: base };
+    let footB = { x: this.x - d * 19 * s, y: base };
 
     switch (this.state) {
       case 'walk': {
-        const p2 = this.anim * 10;
-        footF = { x: this.x + Math.sin(p2) * 18, y: base - Math.max(0, Math.sin(p2)) * 7 };
-        footB = { x: this.x - Math.sin(p2) * 18, y: base - Math.max(0, -Math.sin(p2)) * 7 };
+        const p2 = this.anim * 11;
+        footF = { x: this.x + Math.sin(p2) * 17, y: base - Math.max(0, Math.sin(p2)) * 9 };
+        footB = { x: this.x - Math.sin(p2) * 17, y: base - Math.max(0, -Math.sin(p2)) * 9 };
         break;
       }
       case 'jump':
-        footF = { x: this.x + d * 10, y: base - 26 };
-        footB = { x: this.x - d * 8, y: base - 34 };
-        handF = { x: sho.x + d * 30, y: sho.y + 4 };
-        handB = { x: sho.x - d * 14, y: sho.y + 10 };
+        footF = { x: this.x + d * 8, y: base - 30 * s };
+        footB = { x: this.x - d * 10, y: base - 38 * s };
+        handF = { x: sho.x + d * 32 * s, y: sho.y + 2 };
+        handB = { x: sho.x - d * 16 * s, y: sho.y + 8 };
         break;
       case 'punch':
-        handF = { x: sho.x + d * (18 + 72 * ext), y: sho.y + 14 - 6 * ext };
+        handF = { x: sho.x + d * (16 + 74 * ext), y: sho.y + 12 - 6 * ext };
+        handB = { x: sho.x + d * 6 * s, y: sho.y + 20 };
         break;
       case 'kick':
-        footF = { x: hip.x + d * (12 + 96 * ext), y: hip.y + 46 - 66 * ext };
-        footB = { x: this.x - d * 10, y: base };
-        handF = { x: sho.x - d * 4, y: sho.y + 20 };
-        handB = { x: sho.x - d * 18, y: sho.y + 10 };
+        footF = { x: hip.x + d * (14 + 98 * ext), y: hip.y + 46 - 74 * ext };
+        footB = { x: this.x - d * 7, y: base };
+        handF = { x: sho.x - d * 2, y: sho.y + 18 };
+        handB = { x: sho.x - d * 20 * s, y: sho.y + 4 };
         break;
       case 'block':
-        handF = { x: sho.x + d * 24, y: sho.y + 6 };
-        handB = { x: sho.x + d * 18, y: sho.y + 26 };
+        handF = { x: sho.x + d * 22 * s, y: sho.y + 2 };
+        handB = { x: sho.x + d * 16 * s, y: sho.y + 20 };
         break;
       case 'hit':
-        handF = { x: sho.x - d * 6, y: sho.y - 6 };
-        handB = { x: sho.x - d * 20, y: sho.y + 2 };
+        handF = { x: sho.x - d * 4, y: sho.y - 8 };
+        handB = { x: sho.x - d * 22, y: sho.y };
         break;
     }
 
-    // back limbs first, front limbs last for depth
-    limb(ctx, hip.x, hip.y, footB.x, footB.y, d * 12, 13, colDark);
-    limb(ctx, sho.x, sho.y - 4, handB.x, handB.y, d * 10, 11, colDark);
+    // joints via IK: knees bend toward facing, elbows drop down-back
+    const thigh = 46 * s, shin = 44 * s, uarm = 30 * s, farm = 30 * s;
+    const kneeF = ik(hip, footF, thigh, shin, -d);
+    const kneeB = ik(hip, footB, thigh, shin, -d);
+    const shoF = { x: sho.x + d * 6 * s, y: sho.y };
+    const shoB = { x: sho.x - d * 6 * s, y: sho.y + 2 };
+    const elbF = ik(shoF, handF, uarm, farm, d);
+    const elbB = ik(shoB, handB, uarm, farm, d);
 
-    // torso
-    ctx.strokeStyle = col; ctx.lineWidth = 26; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(sho.x, sho.y); ctx.stroke();
+    // ===== back arm (skin, darker)
+    seg(ctx, shoB, elbB, 11 * s, skinD);
+    seg(ctx, elbB, handB, 9 * s, skinD);
+    disc(ctx, handB, 7 * s, gloveD);
+
+    // ===== back leg
+    seg(ctx, hip, kneeB, 15 * s, pantsD);
+    seg(ctx, kneeB, footB, 12 * s, pantsD);
+    seg(ctx, { x: footB.x - d * 3, y: footB.y - 3 }, { x: footB.x + d * 8, y: footB.y - 2 }, 10 * s, F('#26202e'));
+
+    // ===== torso (tapered: narrow waist, broad chest)
+    const midT = { x: (hip.x + chest.x) / 2, y: (hip.y + chest.y) / 2 };
+    seg(ctx, hip, midT, 22 * s, torsoColD);
+    seg(ctx, midT, chest, 29 * s, torsoCol);
+    if (!c.top && !flash) {
+      // pec + ab hints on bare torsos
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = skinD; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(chest.x + d * 7, chest.y + 10, 5 * s, 0.3, Math.PI - 0.5); ctx.stroke();
+      ctx.beginPath(); ctx.arc(chest.x - d * 3, chest.y + 11, 4.5 * s, 0.3, Math.PI - 0.5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(hip.x - 5 * s, midT.y + 4); ctx.lineTo(hip.x + 5 * s, midT.y + 4); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     // belt
-    ctx.strokeStyle = flash ? '#fff' : c.accent; ctx.lineWidth = 6;
-    ctx.beginPath(); ctx.moveTo(hip.x - 14, hip.y - 4); ctx.lineTo(hip.x + 14, hip.y - 4); ctx.stroke();
+    seg(ctx, { x: hip.x - 14 * s, y: hip.y - 3 }, { x: hip.x + 14 * s, y: hip.y - 3 }, 7, accent);
 
-    limb(ctx, hip.x, hip.y, footF.x, footF.y, -d * 10, 13, col);
+    // ===== front leg (outlined against the back leg)
+    seg(ctx, hip, kneeF, 15 * s + 3, F(shade(c.pants, 0.4)));
+    seg(ctx, kneeF, footF, 12 * s + 3, F(shade(c.pants, 0.4)));
+    seg(ctx, hip, kneeF, 15 * s, pants);
+    seg(ctx, kneeF, footF, 12 * s, pants);
+    disc(ctx, kneeF, 7 * s, pants);
+    seg(ctx, { x: footF.x - d * 3, y: footF.y - 3 }, { x: footF.x + d * 9, y: footF.y - 2 }, 10 * s, F('#332a3d'));
 
-    // shoes
-    ctx.fillStyle = colDark;
-    ctx.beginPath(); ctx.arc(footF.x, footF.y - 2, 7, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(footB.x, footB.y - 2, 7, 0, 7); ctx.fill();
+    // ===== head
+    const hx = chest.x + d * 4 + lean * 0.2, hy = chest.y - 26 * s;
+    seg(ctx, chest, { x: hx, y: hy + 10 }, 9 * s, skin);            // neck
+    disc(ctx, { x: hx, y: hy }, 15 * s, skin);
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = skinD; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(hx, hy + 3, 12 * s, 0.5, Math.PI - 0.5); ctx.stroke(); // jaw hint
+    ctx.globalAlpha = 1;
 
-    // head
-    const hx = sho.x + d * 3 + lean * 0.15, hy = sho.y - 30;
-    ctx.fillStyle = skin;
-    ctx.beginPath(); ctx.arc(hx, hy, 16, 0, 7); ctx.fill();
-    // headband + fluttering tail
-    ctx.strokeStyle = flash ? '#fff' : c.accent; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.moveTo(hx - 15, hy - 6); ctx.lineTo(hx + 15, hy - 6); ctx.stroke();
+    // hair
+    ctx.fillStyle = hair;
+    if (c.hairStyle === 'spiky') {
+      ctx.beginPath();
+      ctx.moveTo(hx - 14 * s, hy - 5);
+      for (let i = 0; i < 5; i++) {
+        const px = hx - 14 * s + (i + 0.5) * (28 * s / 5);
+        ctx.lineTo(px, hy - (23 + (i % 2) * 8) * s);
+        ctx.lineTo(hx - 14 * s + (i + 1) * (28 * s / 5), hy - 8 * s);
+      }
+      ctx.closePath(); ctx.fill();
+    } else if (c.hairStyle === 'mohawk') {
+      ctx.beginPath();
+      ctx.moveTo(hx - 4 * s, hy - 10 * s);
+      ctx.quadraticCurveTo(hx, hy - 30 * s, hx + 6 * s, hy - 10 * s);
+      ctx.closePath(); ctx.fill();
+    } else if (c.hairStyle === 'buzz') {
+      ctx.beginPath(); ctx.arc(hx, hy - 2, 14.5 * s, Math.PI, Math.PI * 2); ctx.fill();
+    } else if (!flash) {
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';                    // bald shine
+      ctx.beginPath(); ctx.arc(hx - d * 4, hy - 8, 3.5, 0, 7); ctx.fill();
+    }
+
+    // headband + fluttering tail (ribbon trails behind and below the head)
+    seg(ctx, { x: hx - 13 * s, y: hy - 4 }, { x: hx + 13 * s, y: hy - 4 }, 5, accent);
     const fl = Math.sin(this.anim * 7) * 4;
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = accent; ctx.lineWidth = 3.5;
     ctx.beginPath();
-    ctx.moveTo(hx - d * 14, hy - 6);
-    ctx.quadraticCurveTo(hx - d * 26, hy - 2 + fl, hx - d * 34, hy + 6 - fl);
+    ctx.moveTo(hx - d * 12 * s, hy - 2);
+    ctx.quadraticCurveTo(hx - d * 24 * s, hy + 5 + fl, hx - d * 31 * s, hy + 15 - fl);
     ctx.stroke();
-    // eye
-    ctx.fillStyle = '#1b1b28';
-    ctx.beginPath(); ctx.arc(hx + d * 7, hy - 2, 2.4, 0, 7); ctx.fill();
 
-    limb(ctx, sho.x, sho.y - 2, handF.x, handF.y, -d * 12, 11, col);
+    // face: angry brow, eye, mouth
+    ctx.strokeStyle = F('#221a24'); ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(hx + d * 2.5, hy - 8); ctx.lineTo(hx + d * 11, hy - 5); ctx.stroke();
+    disc(ctx, { x: hx + d * 7.5, y: hy - 1.5 }, 2.9, F('#f4f0ff'));
+    disc(ctx, { x: hx + d * 8.4, y: hy - 1.5 }, 1.6, F('#221a24'));
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(hx + d * 4, hy + 7.5); ctx.lineTo(hx + d * 10, hy + 6.8); ctx.stroke();
 
-    // fists
-    ctx.fillStyle = skin;
-    ctx.beginPath(); ctx.arc(handF.x, handF.y, 7, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(handB.x, handB.y, 6, 0, 7); ctx.fill();
+    // ===== front arm + glove (outlined so it reads against the torso)
+    const outl = F(shade(c.skin, 0.45));
+    seg(ctx, shoF, elbF, 11 * s + 3, outl);
+    seg(ctx, elbF, handF, 9 * s + 3, outl);
+    seg(ctx, shoF, elbF, 11 * s, skin);
+    seg(ctx, elbF, handF, 9 * s, skin);
+    disc(ctx, shoF, 8 * s, torsoCol);                              // deltoid
+    const punching = this.state === 'punch' && ext > 0.5;
+    disc(ctx, handF, (punching ? 9.5 : 8) * s, glove);
+    ctx.strokeStyle = gloveD; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(handF.x, handF.y, (punching ? 9.5 : 8) * s, 0, 7); ctx.stroke();
 
     // strike glow on active frames
     if (this.attacking && this.attackPhase().active) {
       const pt = this.state === 'punch' ? handF : footF;
-      const g = ctx.createRadialGradient(pt.x, pt.y, 2, pt.x, pt.y, 26);
+      const g = ctx.createRadialGradient(pt.x, pt.y, 2, pt.x, pt.y, 30);
       g.addColorStop(0, 'rgba(255,240,180,0.9)');
       g.addColorStop(1, 'rgba(255,160,60,0)');
       ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 26, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 30, 0, 7); ctx.fill();
     }
 
     ctx.restore();
@@ -285,6 +369,8 @@ export class Game {
     this.particles = [];
     this.shake = 0;
     this.banner = null;
+    this.hitstop = 0;   // brief freeze-frame on landed hits
+    this.combo = null;  // { side, count, t }
 
     this.ai = { think: 0, move: 0, punch: false, kick: false, blockT: 0, jump: false };
     // Latest input received from the remote player (net-host mode).
@@ -338,6 +424,9 @@ export class Game {
       if (this.phaseT >= 2.0) { this.phase = 'fight'; this.phaseT = 0; sfx.play('bell'); }
       return;
     }
+
+    if (this.hitstop > 0) { this.hitstop -= dt; return; }
+    if (this.combo) this.combo.t += dt;
 
     if (this.phase === 'fight') {
       this.time -= dt;
@@ -403,8 +492,17 @@ export class Game {
       FLOOR - def.y - 100,
       blocked
     );
+    const wIdx = att === this.f[0] ? 0 : 1;
+    if (blocked) {
+      this.combo = null;
+    } else {
+      this.hitstop = kind === 'kick' ? 0.08 : 0.055;
+      this.combo = (this.combo && this.combo.side === wIdx && this.combo.t < 1.4)
+        ? { side: wIdx, count: this.combo.count + 1, t: 0 }
+        : { side: wIdx, count: 1, t: 0 };
+    }
     if (def.hp <= 0) {
-      const wIdx = att === this.f[0] ? 0 : 1;
+      this.hitstop = 0.2;
       this.roundOver(wIdx, 'K.O.!');
     }
   }
@@ -458,6 +556,7 @@ export class Game {
       })),
       time: this.time, phase: this.phase, pt: this.phaseT,
       wins: this.wins, round: this.round, banner: this.banner,
+      cb: this.combo ? { s: this.combo.side, c: this.combo.count, t: this.combo.t } : null,
     };
   }
 
@@ -484,6 +583,7 @@ export class Game {
     }
     this.time = s.time; this.phase = s.phase; this.phaseT = s.pt;
     this.wins = s.wins; this.round = s.round; this.banner = s.banner;
+    this.combo = s.cb ? { side: s.cb.s, count: s.cb.c, t: s.cb.t } : null;
   }
 
   statusFor(i) {
@@ -550,6 +650,25 @@ export class Game {
     }
     ctx.globalAlpha = 1;
 
+    // combo counter
+    if (this.combo && this.combo.count >= 2 && this.combo.t < 1.2) {
+      const cx = this.combo.side === 0 ? 200 : W - 200;
+      const pop = 1 + Math.max(0, 0.3 - this.combo.t) * 1.4;
+      ctx.save();
+      ctx.translate(cx, 175);
+      ctx.scale(pop, pop);
+      ctx.rotate(this.combo.side === 0 ? -0.05 : 0.05);
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 42px Impact, "Arial Black", sans-serif';
+      ctx.lineWidth = 7; ctx.strokeStyle = '#1b1026';
+      const txt = `${this.combo.count} HIT COMBO`;
+      ctx.strokeText(txt, 0, 0);
+      ctx.fillStyle = this.f[this.combo.side].ch.color;
+      ctx.fillText(txt, 0, 0);
+      ctx.restore();
+      ctx.textAlign = 'left';
+    }
+
     this.drawHud(ctx);
     this.drawBanner(ctx);
     ctx.restore();
@@ -611,6 +730,19 @@ export class Game {
 
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.beginPath(); ctx.roundRect(x - 3, y - 3, barW + 6, barH + 6, 8); ctx.fill();
+
+      // Tekken-style trailing damage bar: pale segment that drains slowly
+      if (f.ghostHp === undefined) f.ghostHp = f.maxHp;
+      f.ghostHp += (f.hp - f.ghostHp) * 0.045;
+      if (f.ghostHp < f.hp) f.ghostHp = f.hp;
+      const gW = barW * Math.max(0, f.ghostHp / f.maxHp);
+      if (gW > 4) {
+        ctx.fillStyle = 'rgba(255,132,88,0.9)';
+        ctx.beginPath();
+        if (i === 0) ctx.roundRect(x + (barW - gW), y, gW, barH, 5);
+        else ctx.roundRect(x, y, gW, barH, 5);
+        ctx.fill();
+      }
 
       const hpCol = pct > 0.5 ? '#4caf50' : pct > 0.25 ? '#ffb300' : '#e53935';
       ctx.fillStyle = hpCol;
