@@ -44,13 +44,21 @@ ATTACKS = {
 NEUTRAL = dict(move=0.0, jump=False, punch=False, kick=False, block=False)
 
 CHARACTERS = [
-    dict(id='blaze', name='Blaze', color='#ff5533', accent='#ffd166', skin='#f2c197',
+    dict(id='blaze', name='Blaze', color='#ff5533', accent='#ffd166',
+         skin='#e8ac7e', hair='#2b2020', hair_style='spiky',
+         pants='#c03018', glove='#d8262a', top=None, build=1.0,
          speed=1.12, power=1.0, hp=100, desc='Balanced striker'),
-    dict(id='frost', name='Frost', color='#3fb8f5', accent='#e0f7ff', skin='#e8b58c',
+    dict(id='frost', name='Frost', color='#3fb8f5', accent='#e0f7ff',
+         skin='#f0c9a2', hair='#e8e8f0', hair_style='buzz',
+         pants='#2277b8', glove='#1e5f96', top='#2d8fd0', build=1.06,
          speed=0.95, power=0.9, hp=120, desc='Tanky defender'),
-    dict(id='volt', name='Volt', color='#ffd91f', accent='#8c6bff', skin='#c98d5a',
+    dict(id='volt', name='Volt', color='#ffd91f', accent='#8c6bff',
+         skin='#c98d5a', hair='#f5e33d', hair_style='mohawk',
+         pants='#b89b10', glove='#e0b90f', top=None, build=0.94,
          speed=1.35, power=0.82, hp=88, desc='Lightning fast'),
-    dict(id='onyx', name='Onyx', color='#9b6bff', accent='#2b2d42', skin='#8d5524',
+    dict(id='onyx', name='Onyx', color='#9b6bff', accent='#ffd166',
+         skin='#7a4a28', hair='#151018', hair_style='bald',
+         pants='#5b3aa8', glove='#3a2470', top=None, build=1.14,
          speed=0.88, power=1.28, hp=96, desc='Heavy hitter'),
 ]
 
@@ -334,16 +342,31 @@ class Controls:
 
 
 # ---------------------------------------------------------------- fighter
-def limb(surf, a, b, bend, w, color):
-    mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+def ik(a, b, l1, l2, side):
+    """Two-bone IK: elbow/knee position for a limb a→b. side picks bend side."""
     dx, dy = b[0] - a[0], b[1] - a[1]
-    ln = math.hypot(dx, dy) or 1.0
-    e = (mx - dy / ln * bend, my + dx / ln * bend)
-    pygame.draw.line(surf, color, a, e, w)
-    pygame.draw.line(surf, color, e, b, w)
-    r = w // 2
-    for pt in (a, e, b):
-        pygame.draw.circle(surf, color, pt, r)
+    dist = math.hypot(dx, dy) or 0.001
+    m = l1 + l2 - 0.5
+    if dist > m:
+        dist = m
+    cosv = clamp((dist * dist + l1 * l1 - l2 * l2) / (2 * dist * l1), -1, 1)
+    ang = math.atan2(dy, dx) + math.acos(cosv) * side
+    return (a[0] + math.cos(ang) * l1, a[1] + math.sin(ang) * l1)
+
+
+def mixc(c1, c2, t):
+    return tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
+
+
+def qbez(p0, p1, p2, n=8):
+    """Sample a quadratic bezier curve into a point list."""
+    pts = []
+    for i in range(n + 1):
+        t = i / n
+        u = 1 - t
+        pts.append((u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0],
+                    u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1]))
+    return pts
 
 
 class Fighter:
@@ -369,6 +392,8 @@ class Fighter:
         self.knock_v = 0.0
         self.stun = 0.0
         self.walk_dir = 1
+        self.disp_hp = float(self.hp)
+        self.ghost_hp = float(self.hp)
 
     @property
     def grounded(self):
@@ -432,7 +457,7 @@ class Fighter:
             a = ATTACKS[st]
             _, active = self.attack_phase()
             if active and not self.hit_done:
-                game.try_hit(self, opp, a)
+                game.try_hit(self, opp, a, st)
             if self.t >= a['startup'] + a['active'] + a['recovery']:
                 self.set_state('idle')
         elif st == 'block':
@@ -489,15 +514,32 @@ class Fighter:
     def draw(self, surf):
         d = self.facing
         c = self.ch
+        s = c.get('build', 1.0)
         base = FLOOR - self.y
         flash = self.state == 'hit' and self.t < 0.1
-        col = (255, 255, 255) if flash else hexc(c['color'])
-        col_dark = (221, 221, 221) if flash else shade(hexc(c['color']), 0.55)
-        skin = (255, 255, 255) if flash else hexc(c['skin'])
-        accent = (255, 255, 255) if flash else hexc(c['accent'])
+        white = (255, 255, 255)
+
+        def col_of(hx_):
+            return white if flash else hexc(hx_)
+
+        skin = col_of(c['skin'])
+        skin_d = (221, 221, 221) if flash else shade(hexc(c['skin']), 0.72)
+        pants = col_of(c['pants'])
+        pants_d = (205, 205, 205) if flash else shade(hexc(c['pants']), 0.62)
+        pants_o = (190, 190, 190) if flash else shade(hexc(c['pants']), 0.4)
+        glove = col_of(c['glove'])
+        glove_d = (210, 210, 210) if flash else shade(hexc(c['glove']), 0.7)
+        hair = col_of(c['hair'])
+        accent = col_of(c['accent'])
+        outl = (200, 200, 200) if flash else shade(hexc(c['skin']), 0.45)
+        if c.get('top'):
+            torso_col = col_of(c['top'])
+            torso_col_d = (221, 221, 221) if flash else shade(hexc(c['top']), 0.72)
+        else:
+            torso_col, torso_col_d = skin, skin_d
 
         # shadow
-        sw = 46 * max(0.4, 1 - self.y / 300)
+        sw = 48 * s * max(0.4, 1 - self.y / 300)
         sh = pygame.Surface((int(sw * 2), 18), pygame.SRCALPHA)
         pygame.draw.ellipse(sh, (0, 0, 0, 90), sh.get_rect())
         surf.blit(sh, (self.x - sw, FLOOR + 3))
@@ -515,94 +557,175 @@ class Fighter:
             dx, dy = p[0] - self.x, p[1] - base
             return (self.x + dx * ca - dy * sa, base + dx * sa + dy * ca)
 
+        def SEG(a, b, w, color):
+            a, b = tp(a), tp(b)
+            pygame.draw.line(surf, color, a, b, max(1, int(w)))
+            r = int(w / 2)
+            pygame.draw.circle(surf, color, a, r)
+            pygame.draw.circle(surf, color, b, r)
+
+        def DISC(p, r, color, width=0):
+            pygame.draw.circle(surf, color, tp(p), int(r), width)
+
+        def CURVE(pts, w, color):
+            pygame.draw.lines(surf, color, False, [tp(p) for p in pts], max(1, int(w)))
+
+        def POLY(pts, color):
+            pygame.draw.polygon(surf, color, [tp(p) for p in pts])
+
+        def ARC(cx, cy, r, a0, a1, w, color, n=10):
+            pts = [(cx + math.cos(a0 + (a1 - a0) * i / n) * r,
+                    cy + math.sin(a0 + (a1 - a0) * i / n) * r) for i in range(n + 1)]
+            CURVE(pts, w, color)
+
+        # pose parameters
         ext = self.attack_phase()[0] if self.attacking else 0.0
         lean, crouch = 0.0, 0.0
         if self.state == 'punch':
-            lean = d * 8 * ext
+            lean = d * 10 * ext
         elif self.state == 'kick':
-            lean = -d * 12 * ext
+            lean = -d * 14 * ext
         elif self.state == 'block':
-            crouch = 8.0
+            crouch = 10.0
         elif self.state == 'hit':
-            lean = -d * 16
+            lean = -d * 18
 
-        bob = math.sin(self.anim * 5) * 2.5 if self.state == 'idle' else 0.0
-        hip = (self.x - d * 2 + lean * 0.4, base - 74 + crouch + bob)
-        sho = (self.x + lean, base - 126 + crouch * 1.5 + bob)
+        bob = math.sin(self.anim * 4) * 2.2 if self.state == 'idle' else 0.0
+        hip = (self.x - d * 2 + lean * 0.35, base - 84 * s + crouch + bob)
+        chest = (self.x + lean + (d * 7 * ext if self.state == 'punch' else 0),
+                 base - 130 * s + crouch * 1.4 + bob)
+        sho = (chest[0], chest[1] + 2)
 
-        hand_f = (sho[0] + d * 26, sho[1] + 16)
-        hand_b = (sho[0] + d * 12, sho[1] + 24)
-        foot_f = (self.x + d * 14, base)
-        foot_b = (self.x - d * 16, base)
+        # default fighting stance
+        hand_f = (sho[0] + d * 27 * s, sho[1] + 15 + bob * 0.5)
+        hand_b = (sho[0] + d * 11 * s, sho[1] + 23)
+        foot_f = (self.x + d * 17 * s, base)
+        foot_b = (self.x - d * 19 * s, base)
 
         st = self.state
         if st == 'walk':
-            p2 = self.anim * 10
-            foot_f = (self.x + math.sin(p2) * 18, base - max(0, math.sin(p2)) * 7)
-            foot_b = (self.x - math.sin(p2) * 18, base - max(0, -math.sin(p2)) * 7)
+            p2 = self.anim * 11
+            foot_f = (self.x + math.sin(p2) * 17, base - max(0, math.sin(p2)) * 9)
+            foot_b = (self.x - math.sin(p2) * 17, base - max(0, -math.sin(p2)) * 9)
         elif st == 'jump':
-            foot_f = (self.x + d * 10, base - 26)
-            foot_b = (self.x - d * 8, base - 34)
-            hand_f = (sho[0] + d * 30, sho[1] + 4)
-            hand_b = (sho[0] - d * 14, sho[1] + 10)
+            foot_f = (self.x + d * 8, base - 30 * s)
+            foot_b = (self.x - d * 10, base - 38 * s)
+            hand_f = (sho[0] + d * 32 * s, sho[1] + 2)
+            hand_b = (sho[0] - d * 16 * s, sho[1] + 8)
         elif st == 'punch':
-            hand_f = (sho[0] + d * (18 + 72 * ext), sho[1] + 14 - 6 * ext)
+            hand_f = (sho[0] + d * (16 + 74 * ext), sho[1] + 12 - 6 * ext)
+            hand_b = (sho[0] + d * 6 * s, sho[1] + 20)
         elif st == 'kick':
-            foot_f = (hip[0] + d * (12 + 96 * ext), hip[1] + 46 - 66 * ext)
-            foot_b = (self.x - d * 10, base)
-            hand_f = (sho[0] - d * 4, sho[1] + 20)
-            hand_b = (sho[0] - d * 18, sho[1] + 10)
+            foot_f = (hip[0] + d * (14 + 98 * ext), hip[1] + 46 - 74 * ext)
+            foot_b = (self.x - d * 7, base)
+            hand_f = (sho[0] - d * 2, sho[1] + 18)
+            hand_b = (sho[0] - d * 20 * s, sho[1] + 4)
         elif st == 'block':
-            hand_f = (sho[0] + d * 24, sho[1] + 6)
-            hand_b = (sho[0] + d * 18, sho[1] + 26)
+            hand_f = (sho[0] + d * 22 * s, sho[1] + 2)
+            hand_b = (sho[0] + d * 16 * s, sho[1] + 20)
         elif st == 'hit':
-            hand_f = (sho[0] - d * 6, sho[1] - 6)
-            hand_b = (sho[0] - d * 20, sho[1] + 2)
+            hand_f = (sho[0] - d * 4, sho[1] - 8)
+            hand_b = (sho[0] - d * 22, sho[1])
 
-        hip, sho = tp(hip), tp(sho)
-        hand_f, hand_b = tp(hand_f), tp(hand_b)
-        foot_f, foot_b = tp(foot_f), tp(foot_b)
+        # joints via IK: knees bend toward facing, elbows drop down-back
+        thigh, shin, uarm, farm = 46 * s, 44 * s, 30 * s, 30 * s
+        knee_f = ik(hip, foot_f, thigh, shin, -d)
+        knee_b = ik(hip, foot_b, thigh, shin, -d)
+        sho_f = (sho[0] + d * 6 * s, sho[1])
+        sho_b = (sho[0] - d * 6 * s, sho[1] + 2)
+        elb_f = ik(sho_f, hand_f, uarm, farm, d)
+        elb_b = ik(sho_b, hand_b, uarm, farm, d)
 
-        limb(surf, hip, foot_b, d * 12, 13, col_dark)
-        limb(surf, (sho[0], sho[1] - 4), hand_b, d * 10, 11, col_dark)
+        # ===== back arm
+        SEG(sho_b, elb_b, 11 * s, skin_d)
+        SEG(elb_b, hand_b, 9 * s, skin_d)
+        DISC(hand_b, 7 * s, glove_d)
 
-        # torso
-        pygame.draw.line(surf, col, hip, sho, 26)
-        pygame.draw.circle(surf, col, hip, 13)
-        pygame.draw.circle(surf, col, sho, 13)
+        # ===== back leg
+        SEG(hip, knee_b, 15 * s, pants_d)
+        SEG(knee_b, foot_b, 12 * s, pants_d)
+        SEG((foot_b[0] - d * 3, foot_b[1] - 3), (foot_b[0] + d * 8, foot_b[1] - 2),
+            10 * s, white if flash else (38, 32, 46))
+
+        # ===== torso (tapered: narrow waist, broad chest)
+        mid_t = ((hip[0] + chest[0]) / 2, (hip[1] + chest[1]) / 2)
+        SEG(hip, mid_t, 22 * s, torso_col_d)
+        SEG(mid_t, chest, 29 * s, torso_col)
+        if not c.get('top') and not flash:
+            hint = mixc(skin, skin_d, 0.45)
+            ARC(chest[0] + d * 7, chest[1] + 10, 5 * s, 0.3, math.pi - 0.5, 2, hint)
+            ARC(chest[0] - d * 3, chest[1] + 11, 4.5 * s, 0.3, math.pi - 0.5, 2, hint)
+            SEG((hip[0] - 5 * s, mid_t[1] + 4), (hip[0] + 5 * s, mid_t[1] + 4), 2, hint)
         # belt
-        pygame.draw.line(surf, accent,
-                         (hip[0] - 14, hip[1] - 4), (hip[0] + 14, hip[1] - 4), 6)
+        SEG((hip[0] - 14 * s, hip[1] - 3), (hip[0] + 14 * s, hip[1] - 3), 7, accent)
 
-        limb(surf, hip, foot_f, -d * 10, 13, col)
+        # ===== front leg (outlined against the back leg)
+        SEG(hip, knee_f, 15 * s + 3, pants_o)
+        SEG(knee_f, foot_f, 12 * s + 3, pants_o)
+        SEG(hip, knee_f, 15 * s, pants)
+        SEG(knee_f, foot_f, 12 * s, pants)
+        DISC(knee_f, 7 * s, pants)
+        SEG((foot_f[0] - d * 3, foot_f[1] - 3), (foot_f[0] + d * 9, foot_f[1] - 2),
+            10 * s, white if flash else (51, 42, 61))
 
-        # shoes
-        pygame.draw.circle(surf, col_dark, (foot_f[0], foot_f[1] - 2), 7)
-        pygame.draw.circle(surf, col_dark, (foot_b[0], foot_b[1] - 2), 7)
+        # ===== head
+        hx, hy = chest[0] + d * 4 + lean * 0.2, chest[1] - 26 * s
+        SEG(chest, (hx, hy + 10), 9 * s, skin)                     # neck
+        DISC((hx, hy), 15 * s, skin)
+        if not flash:
+            ARC(hx, hy + 3, 12 * s, 0.5, math.pi - 0.5, 2, mixc(skin, skin_d, 0.35))
 
-        # head + headband
-        hx, hy = sho[0] + d * 3 + lean * 0.15, sho[1] - 30
-        pygame.draw.circle(surf, skin, (hx, hy), 16)
-        pygame.draw.line(surf, accent, (hx - 15, hy - 6), (hx + 15, hy - 6), 5)
+        # hair
+        style = c.get('hair_style')
+        if style == 'spiky':
+            pts = [(hx - 14 * s, hy - 5)]
+            for i in range(5):
+                px = hx - 14 * s + (i + 0.5) * (28 * s / 5)
+                pts.append((px, hy - (23 + (i % 2) * 8) * s))
+                pts.append((hx - 14 * s + (i + 1) * (28 * s / 5), hy - 8 * s))
+            POLY(pts, hair)
+        elif style == 'mohawk':
+            POLY([(hx - 4 * s, hy - 10 * s), (hx + 1 * s, hy - 30 * s),
+                  (hx + 6 * s, hy - 10 * s)], hair)
+        elif style == 'buzz':
+            n = 12
+            pts = [(hx + math.cos(math.pi + math.pi * i / n) * 14.5 * s,
+                    hy - 2 + math.sin(math.pi + math.pi * i / n) * 14.5 * s) for i in range(n + 1)]
+            POLY(pts, hair)
+        elif not flash:
+            DISC((hx - d * 4, hy - 8), 3.5, (255, 255, 255) if False else mixc(skin, white, 0.35))  # bald shine
+
+        # headband + fluttering tail
+        SEG((hx - 13 * s, hy - 4), (hx + 13 * s, hy - 4), 5, accent)
         fl = math.sin(self.anim * 7) * 4
-        pygame.draw.lines(surf, accent, False,
-                          [(hx - d * 14, hy - 6), (hx - d * 26, hy - 2 + fl),
-                           (hx - d * 34, hy + 6 - fl)], 4)
-        pygame.draw.circle(surf, (27, 27, 40), (hx + d * 7, hy - 2), 3)
+        CURVE(qbez((hx - d * 12 * s, hy - 2),
+                   (hx - d * 24 * s, hy + 5 + fl),
+                   (hx - d * 31 * s, hy + 15 - fl)), 3.5, accent)
 
-        limb(surf, (sho[0], sho[1] - 2), hand_f, -d * 12, 11, col)
+        # face: angry brow, eye, mouth
+        dark = white if flash else (34, 26, 36)
+        SEG((hx + d * 2.5, hy - 8), (hx + d * 11, hy - 5), 2.6, dark)
+        DISC((hx + d * 7.5, hy - 1.5), 2.9, white if flash else (244, 240, 255))
+        DISC((hx + d * 8.4, hy - 1.5), 1.6, dark)
+        SEG((hx + d * 4, hy + 7.5), (hx + d * 10, hy + 6.8), 2, dark)
 
-        # fists
-        pygame.draw.circle(surf, skin, hand_f, 7)
-        pygame.draw.circle(surf, skin, hand_b, 6)
+        # ===== front arm + glove (outlined so it reads against the torso)
+        SEG(sho_f, elb_f, 11 * s + 3, outl)
+        SEG(elb_f, hand_f, 9 * s + 3, outl)
+        SEG(sho_f, elb_f, 11 * s, skin)
+        SEG(elb_f, hand_f, 9 * s, skin)
+        DISC(sho_f, 8 * s, torso_col)                              # deltoid
+        punching = self.state == 'punch' and ext > 0.5
+        DISC(hand_f, (9.5 if punching else 8) * s, glove)
+        DISC(hand_f, (9.5 if punching else 8) * s, glove_d, 2)
 
         # strike glow on active frames
         if self.attacking and self.attack_phase()[1]:
-            pt = hand_f if self.state == 'punch' else foot_f
-            glow = pygame.Surface((60, 60), pygame.SRCALPHA)
-            pygame.draw.circle(glow, (255, 160, 60, 70), (30, 30), 28)
-            pygame.draw.circle(glow, (255, 240, 180, 160), (30, 30), 14)
-            surf.blit(glow, (pt[0] - 30, pt[1] - 30))
+            pt = tp(hand_f if self.state == 'punch' else foot_f)
+            glow = pygame.Surface((66, 66), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (255, 160, 60, 70), (33, 33), 31)
+            pygame.draw.circle(glow, (255, 240, 180, 160), (33, 33), 15)
+            surf.blit(glow, (pt[0] - 33, pt[1] - 33))
 
 
 # ---------------------------------------------------------------- game
@@ -619,6 +742,8 @@ class Game:
         self.shake = 0.0
         self.banner = None
         self.ai = dict(think=0.0, move=0.0, block_t=0.0)
+        self.hitstop = 0.0   # brief freeze-frame on landed hits
+        self.combo = None    # dict(side=, count=, t=)
         self.start_round()
 
     def start_round(self):
@@ -648,6 +773,12 @@ class Game:
                 self.phase_t = 0.0
                 self.sfx.play('bell')
             return
+
+        if self.hitstop > 0:
+            self.hitstop -= dt
+            return
+        if self.combo:
+            self.combo['t'] += dt
 
         if self.phase == 'fight':
             self.time -= dt
@@ -688,7 +819,7 @@ class Game:
             a.x = clamp(a.x - direction * overlap / 2, ARENA_L, ARENA_R)
             b.x = clamp(b.x + direction * overlap / 2, ARENA_L, ARENA_R)
 
-    def try_hit(self, att, defender, a):
+    def try_hit(self, att, defender, a, kind=None):
         dx = (defender.x - att.x) * att.facing
         if dx < 8 or dx > a['range'] + 38:
             return
@@ -700,8 +831,18 @@ class Game:
         defender.take_hit(dmg, att.facing, a, blocked, self)
         self.spawn_sparks(att.x + att.facing * a['range'] * 0.7,
                           FLOOR - defender.y - 100, blocked)
+        w_idx = 0 if att is self.f[0] else 1
+        if blocked:
+            self.combo = None
+        else:
+            self.hitstop = 0.08 if kind == 'kick' else 0.055
+            if self.combo and self.combo['side'] == w_idx and self.combo['t'] < 1.4:
+                self.combo = dict(side=w_idx, count=self.combo['count'] + 1, t=0.0)
+            else:
+                self.combo = dict(side=w_idx, count=1, t=0.0)
         if defender.hp <= 0:
-            self.round_over(0 if att is self.f[0] else 1, 'K.O.!')
+            self.hitstop = 0.2
+            self.round_over(w_idx, 'K.O.!')
 
     def round_over(self, winner_idx, label):
         if self.phase != 'fight':
@@ -975,6 +1116,20 @@ class App:
                                (ps.get_width() // 2,) * 2, p['size'])
             arena.blit(ps, (p['x'] - p['size'], p['y'] - p['size']))
 
+        # combo counter
+        if g.combo and g.combo['count'] >= 2 and g.combo['t'] < 1.2:
+            cx = 200 if g.combo['side'] == 0 else W - 200
+            pop = 1 + max(0.0, 0.3 - g.combo['t']) * 1.4
+            tilt = 3 if g.combo['side'] == 0 else -3
+            txt = f"{g.combo['count']} HIT COMBO"
+            col = hexc(g.f[g.combo['side']].ch['color'])
+            img = pygame.transform.rotozoom(self.fonts['h2'].render(txt, True, col), tilt, pop)
+            shadow = pygame.transform.rotozoom(self.fonts['h2'].render(txt, True, (27, 16, 38)), tilt, pop)
+            r = img.get_rect(center=(cx, 175))
+            for off in ((-3, 0), (3, 0), (0, -3), (0, 3)):
+                arena.blit(shadow, r.move(off))
+            arena.blit(img, r)
+
         self.draw_hud(arena)
         self.draw_banner(arena)
 
@@ -1026,6 +1181,16 @@ class App:
             x = 40 if i == 0 else W - 40 - bar_w
 
             pygame.draw.rect(surf, (10, 8, 18), (x - 3, y - 3, bar_w + 6, bar_h + 6), border_radius=8)
+            # trailing damage bar (drains slowly behind the real one)
+            if not hasattr(f, 'ghost_hp'):
+                f.ghost_hp = float(f.max_hp)
+            f.ghost_hp += (f.hp - f.ghost_hp) * 0.045
+            if f.ghost_hp < f.hp:
+                f.ghost_hp = float(f.hp)
+            g_w = int(bar_w * max(0.0, f.ghost_hp / f.max_hp))
+            if g_w > 4:
+                gx = x + bar_w - g_w if i == 0 else x
+                pygame.draw.rect(surf, (255, 132, 88), (gx, y, g_w, bar_h), border_radius=5)
             hp_col = (76, 175, 80) if pct > 0.5 else (255, 179, 0) if pct > 0.25 else (229, 57, 53)
             fill = int(bar_w * pct)
             if fill > 4:
