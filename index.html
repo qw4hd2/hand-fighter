@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hand Fighter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ============ MAIN MENU ============ -->
+  <section id="menu-screen" class="screen active">
+    <h1 class="logo">HAND<span>FIGHTER</span></h1>
+    <p class="tagline">Fight with your hands — no controller, just your camera</p>
+
+    <div class="menu-buttons">
+      <button id="btn-1p" class="big-btn">1 PLAYER <small>vs CPU</small></button>
+      <button id="btn-2p" class="big-btn">2 PLAYERS <small>same camera</small></button>
+    </div>
+
+    <div class="help-box">
+      <h3>Hand controls</h3>
+      <div class="help-grid">
+        <div><span class="g">✋</span> Open palm — lean left / right to <b>move</b></div>
+        <div><span class="g">☝️✋</span> Raise hand high to <b>jump</b></div>
+        <div><span class="g">✊</span> Fist — <b>punch</b></div>
+        <div><span class="g">✌️</span> Two fingers — <b>kick</b></div>
+        <div><span class="g">🤟</span> Three fingers — <b>block</b></div>
+      </div>
+      <h3>Keyboard backup</h3>
+      <div class="help-grid small">
+        <div><b>P1:</b> A / D move · W jump · S block · F punch · G kick</div>
+        <div><b>P2:</b> ← / → move · ↑ jump · ↓ block · K punch · L kick</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHARACTER SELECT ============ -->
+  <section id="setup-screen" class="screen">
+    <h2 class="screen-title">CHOOSE YOUR FIGHTER</h2>
+    <div id="setup-panels">
+      <div class="setup-panel" id="panel-p1">
+        <h3>Player 1</h3>
+        <input id="name-p1" type="text" maxlength="14" placeholder="Enter your name" value="Player 1">
+        <div class="char-cards" id="cards-p1"></div>
+      </div>
+      <div class="setup-panel" id="panel-p2">
+        <h3 id="panel-p2-title">Player 2</h3>
+        <input id="name-p2" type="text" maxlength="14" placeholder="Enter your name" value="Player 2">
+        <div class="char-cards" id="cards-p2"></div>
+      </div>
+    </div>
+    <div class="setup-actions">
+      <button id="btn-back" class="small-btn">← Back</button>
+      <button id="btn-fight" class="big-btn fight-btn">FIGHT!</button>
+    </div>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section id="game-screen" class="screen">
+    <div id="game-wrap">
+      <canvas id="game-canvas" width="1280" height="620"></canvas>
+
+      <div id="cam-panel">
+        <video id="cam-video" playsinline muted autoplay></video>
+        <canvas id="cam-canvas" width="320" height="180"></canvas>
+        <div id="cam-status">camera: starting…</div>
+      </div>
+
+      <div id="end-buttons" class="hidden">
+        <button id="btn-rematch" class="big-btn">REMATCH</button>
+        <button id="btn-newfighters" class="small-btn">Change fighters</button>
+        <button id="btn-menu2" class="small-btn">Main menu</button>
+      </div>
+
+      <button id="btn-quit" title="Quit to menu">✕</button>
+    </div>
+  </section>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
