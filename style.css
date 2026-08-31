@@ -1,5 +1,16 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+.hidden { display: none !important; }
+
+#arcade-info {
+  background: rgba(255, 209, 102, .1);
+  border: 1px dashed rgba(255, 209, 102, .5);
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 15px; line-height: 1.7;
+  margin-bottom: 14px;
+}
+
 body {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;

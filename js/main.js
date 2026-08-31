@@ -26,6 +26,10 @@ const state = {
 const handsEnabled = () => localStorage.getItem('hf-hands') !== '0';
 const soundMuted = () => localStorage.getItem('hf-mute') === '1';
 
+// Arcade ladder: opponent order (roster indexes) and per-stage difficulty.
+const ARCADE_LADDER = [1, 2, 4, 0, 3, 5];   // Frost, Volt, Kira, Blaze, Onyx, Sensei
+const ARCADE_DIFF = ['easy', 'easy', 'normal', 'normal', 'hard', 'hard'];
+
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   $(id).classList.add('active');
@@ -62,9 +66,15 @@ function renderDifficulty() {
 
 function openSetup(mode) {
   state.mode = mode;
+  const arcade = mode === 'arcade';
   $('difficulty-row').classList.toggle('hidden', mode !== 'cpu');
+  $('arcade-info').classList.toggle('hidden', !arcade);
+  $('name-p2').classList.toggle('hidden', arcade);
+  $('cards-p2').classList.toggle('hidden', arcade);
   renderDifficulty();
-  if (mode === 'cpu') {
+  if (arcade) {
+    $('panel-p2-title').textContent = 'ARCADE LADDER';
+  } else if (mode === 'cpu') {
     $('panel-p2-title').textContent = 'CPU Opponent';
     $('name-p2').value = 'CPU';
     $('name-p2').disabled = true;
@@ -140,21 +150,25 @@ function cleanupNet() {
 // ---------- local fight (1P / same-camera 2P) ----------
 function startFight() {
   sfx.unlock();
+  const arcade = state.mode === 'arcade';
   const ch1 = CHARACTERS[state.chars[0]];
-  const ch2 = CHARACTERS[state.chars[1]];
+  const ch2 = arcade
+    ? CHARACTERS[ARCADE_LADDER[state.arcade.stage]]
+    : CHARACTERS[state.chars[1]];
+  const vsCpu = arcade || state.mode === 'cpu';
   const cfg = {
-    mode: state.mode,
-    difficulty: state.difficulty,
+    mode: vsCpu ? 'cpu' : state.mode,
+    difficulty: arcade ? ARCADE_DIFF[state.arcade.stage] : state.difficulty,
     p1: { name: $('name-p1').value.trim() || 'Player 1', ch: ch1 },
-    p2: { name: state.mode === 'cpu' ? `CPU ${ch2.name}` : ($('name-p2').value.trim() || 'Player 2'), ch: ch2 },
+    p2: { name: vsCpu ? `CPU ${ch2.name}` : ($('name-p2').value.trim() || 'Player 2'), ch: ch2 },
   };
 
   enterFightUi();
 
-  state.controls = new Controls(state.mode);
+  state.controls = new Controls(vsCpu ? 'cpu' : state.mode);
   startTracker(state.mode === '2p');
   state.game = new Game($('game-canvas'), cfg, state.controls, {
-    onMatchEnd: () => showEndButtons(),
+    onMatchEnd: (w) => showEndButtons(w),
   });
 }
 
@@ -286,7 +300,7 @@ function onNetLost() {
   $('online-status').textContent = 'partner disconnected';
 }
 
-function showEndButtons() {
+function showEndButtons(winnerIdx) {
   CG.gameplayStop();
   CG.happytime();
   state.matchEnded = true;
@@ -295,6 +309,32 @@ function showEndButtons() {
   // Guests can't restart the match — the host drives it.
   $('btn-rematch').style.display = state.role === 'guest' ? 'none' : '';
   $('btn-newfighters').style.display = online ? 'none' : '';
+  $('btn-next').classList.add('hidden');
+
+  if (state.mode === 'arcade' && state.arcade) {
+    $('btn-newfighters').style.display = 'none';
+    if (winnerIdx === 0) {
+      const beaten = state.arcade.stage + 1;
+      if (beaten >= ARCADE_LADDER.length) {
+        // full ladder cleared!
+        if (state.game) {
+          state.game.banner = { main: 'CHAMPION!', sub: 'you defeated all six fighters' };
+        }
+        $('btn-rematch').style.display = 'none';
+        state.arcade = null;
+      } else {
+        state.arcade.stage = beaten;
+        const next = CHARACTERS[ARCADE_LADDER[beaten]];
+        if (state.game && state.game.banner) {
+          state.game.banner.sub = `${beaten} of 6 defeated — next: ${next.name}`;
+        }
+        $('btn-rematch').style.display = 'none';
+        $('btn-next').classList.remove('hidden');
+      }
+    } else if (state.game && state.game.banner) {
+      state.game.banner.sub = 'the run ends here — try again!';
+    }
+  }
 }
 
 function quitToMenu() {
@@ -312,6 +352,15 @@ function quitToMenu() {
 }
 
 // ---------- buttons ----------
+$('btn-arcade').addEventListener('click', () => {
+  sfx.unlock();
+  state.arcade = { stage: 0 };
+  openSetup('arcade');
+});
+$('btn-next').addEventListener('click', () => {
+  state.matchEnded = false;
+  CG.midgameAd(sfx, () => { stopFight(); startFight(); });
+});
 $('btn-1p').addEventListener('click', () => { sfx.unlock(); openSetup('cpu'); });
 $('btn-2p').addEventListener('click', () => { sfx.unlock(); openSetup('2p'); });
 $('btn-online').addEventListener('click', openOnline);
