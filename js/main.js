@@ -129,6 +129,7 @@ function stopFight() {
 }
 
 function cleanupNet() {
+  CG.hideInviteButton();
   if (state.netTimer) { clearInterval(state.netTimer); state.netTimer = null; }
   if (state.net) { state.net.close(); state.net = null; }
   state.role = null;
@@ -189,6 +190,7 @@ function netHandlers(role) {
       const inv = CG.inviteUrl(code);
       state.inviteUrl = inv;
       $('btn-invite').classList.toggle('hidden', !inv);
+      CG.showInviteButton(code);
     },
     onConnected: () => {
       if (role === 'guest') {
@@ -384,13 +386,21 @@ $('btn-invite').addEventListener('click', (e) => {
   }
 });
 
-// initialize the CrazyGames SDK (no-op elsewhere) and honor invite links
+// initialize the CrazyGames SDK (no-op elsewhere), honor invite links and
+// instant-multiplayer launches (party leaders land straight in a lobby)
 CG.init().then(() => {
   const room = CG.inviteParam();
   if (room) {
     openOnline();
     $('join-code').value = String(room).toUpperCase().slice(0, 4);
-    $('online-status').textContent = 'invite received — click JOIN to enter the room';
+    if (CG.instantMultiplayer) {
+      $('btn-join').click();           // invited player: join immediately
+    } else {
+      $('online-status').textContent = 'invite received — click JOIN to enter the room';
+    }
+  } else if (CG.instantMultiplayer) {
+    openOnline();
+    $('btn-create').click();           // party leader: open a room immediately
   }
 });
 

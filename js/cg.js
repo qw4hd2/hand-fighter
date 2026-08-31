@@ -32,6 +32,15 @@ export const CG = {
     try { return window.CrazyGames.SDK.game.getInviteParam('room'); } catch (e) { return null; }
   },
 
+  // True when a party leader launched the game expecting to land in a lobby.
+  get instantMultiplayer() {
+    if (!this.active) return false;
+    try { return !!window.CrazyGames.SDK.game.isInstantMultiplayer; } catch (e) { return false; }
+  },
+
+  showInviteButton(code) { this._call(s => s.game.showInviteButton({ room: code })); },
+  hideInviteButton() { this._call(s => s.game.hideInviteButton()); },
+
   // Midgame ad at a natural break. Mutes audio during the ad and ALWAYS
   // calls done() — even on error or timeout — so the game can never get stuck.
   midgameAd(sfx, done) {
