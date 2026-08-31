@@ -22,8 +22,10 @@ function newPlayerState() {
 
 export class Controls {
   constructor(mode) {
-    this.mode = mode; // 'cpu' | '2p'
+    this.mode = mode; // 'cpu' | '2p' | 'online'
     this.keys = {};
+    this.tMove = 0;        // on-screen touch buttons (always player 0)
+    this.tBlock = false;
     this.p = [newPlayerState(), newPlayerState()];
 
     this._down = (e) => {
@@ -79,13 +81,28 @@ export class Controls {
     }
   }
 
+  // On-screen touch buttons — they always drive the local player (index 0).
+  touchSet(name, down) {
+    const p = this.p[0];
+    if (name === 'left') this.tMove = down ? -1 : (this.tMove === -1 ? 0 : this.tMove);
+    else if (name === 'right') this.tMove = down ? 1 : (this.tMove === 1 ? 0 : this.tMove);
+    else if (name === 'block') this.tBlock = down;
+    else if (down) {
+      if (name === 'punch') p.pendingPunch = true;
+      if (name === 'kick') p.pendingKick = true;
+      if (name === 'jump') p.pendingJump = true;
+    }
+  }
+
   // Called once per game frame; edge-triggered actions are consumed.
   consume(i) {
     const p = this.p[i], m = KEYMAPS[i];
     const kbMove = (this.keys[m.left] ? -1 : 0) + (this.keys[m.right] ? 1 : 0);
+    const tMove = i === 0 ? this.tMove : 0;
+    const tBlock = i === 0 && this.tBlock;
     const input = {
-      move: kbMove !== 0 ? kbMove : p.hMove,
-      block: !!this.keys[m.block] || p.hBlock,
+      move: kbMove !== 0 ? kbMove : (tMove !== 0 ? tMove : p.hMove),
+      block: !!this.keys[m.block] || tBlock || p.hBlock,
       punch: p.pendingPunch,
       kick: p.pendingKick,
       jump: p.pendingJump,

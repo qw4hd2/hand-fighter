@@ -87,11 +87,26 @@
     <div id="game-wrap">
       <canvas id="game-canvas" width="1280" height="620"></canvas>
 
-      <div id="cam-panel">
+      <div id="cam-panel" title="tap to shrink / hide the camera preview">
         <video id="cam-video" playsinline muted autoplay></video>
         <canvas id="cam-canvas" width="320" height="180"></canvas>
         <div id="cam-status">camera: starting…</div>
       </div>
+
+      <div id="touch-controls" class="hidden">
+        <div class="tc tc-left">
+          <button class="tc-btn" data-k="left">◀</button>
+          <button class="tc-btn" data-k="right">▶</button>
+          <button class="tc-btn tc-up" data-k="jump">▲</button>
+        </div>
+        <div class="tc tc-right">
+          <button class="tc-btn tc-block" data-k="block">🛡</button>
+          <button class="tc-btn tc-punch" data-k="punch">👊</button>
+          <button class="tc-btn tc-kick" data-k="kick">🦶</button>
+        </div>
+      </div>
+
+      <div id="rotate-hint">🔄 rotate your phone sideways for the best view</div>
 
       <div id="end-buttons" class="hidden">
         <button id="btn-rematch" class="big-btn">REMATCH</button>

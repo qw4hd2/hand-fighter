@@ -65,6 +65,25 @@ function openSetup(mode) {
 }
 
 // ---------- shared fight helpers ----------
+const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+
+function enterFightUi() {
+  showScreen('game-screen');
+  $('end-buttons').classList.add('hidden');
+  $('touch-controls').classList.toggle('hidden', !IS_TOUCH);
+  if (IS_TOUCH) {
+    // best-effort fullscreen landscape on phones; ignore if the browser refuses
+    try {
+      const p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+      if (p && p.then) p.then(() => {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(() => {});
+        }
+      }).catch(() => {});
+    } catch (e) { /* not supported */ }
+  }
+}
+
 function startTracker(twoPlayerCam) {
   state.tracker = new HandTracker({
     video: $('cam-video'),
@@ -103,8 +122,7 @@ function startFight() {
     p2: { name: state.mode === 'cpu' ? `CPU ${ch2.name}` : ($('name-p2').value.trim() || 'Player 2'), ch: ch2 },
   };
 
-  showScreen('game-screen');
-  $('end-buttons').classList.add('hidden');
+  enterFightUi();
 
   state.controls = new Controls(state.mode);
   startTracker(state.mode === '2p');
@@ -196,8 +214,7 @@ function startOnlineFight(role, p1Info, p2Info) {
     ? { mode: 'net-host', p1: mk(p1Info), p2: mk(p2Info) }
     : { mode: 'ghost', ownSide: 1, p1: mk(p1Info), p2: mk(p2Info) };
 
-  showScreen('game-screen');
-  $('end-buttons').classList.add('hidden');
+  enterFightUi();
   state.controls = new Controls('online');
   startTracker(false);
   state.game = new Game($('game-canvas'), state.onlineCfg, state.controls, {
@@ -276,6 +293,25 @@ $('btn-create').addEventListener('click', () => {
 $('join-code').addEventListener('input', (e) => {
   e.target.value = e.target.value.replace(/\s+/g, '').toUpperCase();
 });
+// on-screen touch buttons drive the local player
+document.querySelectorAll('#touch-controls .tc-btn').forEach((btn) => {
+  const k = btn.dataset.k;
+  const down = (e) => { e.preventDefault(); if (state.controls) state.controls.touchSet(k, true); };
+  const up = (e) => { e.preventDefault(); if (state.controls) state.controls.touchSet(k, false); };
+  btn.addEventListener('pointerdown', down);
+  btn.addEventListener('pointerup', up);
+  btn.addEventListener('pointercancel', up);
+  btn.addEventListener('pointerleave', up);
+});
+
+// tap the camera preview to shrink or hide it
+const CAM_MODES = ['', 'cam-mini', 'cam-hidden'];
+let camMode = 0;
+$('cam-panel').addEventListener('click', () => {
+  camMode = (camMode + 1) % CAM_MODES.length;
+  $('cam-panel').className = CAM_MODES[camMode];
+});
+
 $('btn-join').addEventListener('click', () => {
   const code = $('join-code').value.replace(/\s+/g, '').toUpperCase();
   if (code.length !== 4) {

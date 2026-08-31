@@ -157,20 +157,67 @@ body {
 }
 
 #cam-panel {
-  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
-  width: 240px; text-align: center;
+  position: absolute; top: 88px; right: 10px;
+  width: 150px; text-align: center;
+  cursor: pointer;
+  transition: width .15s, opacity .15s;
+  opacity: .85;
 }
+#cam-panel:hover { opacity: 1; }
+#cam-panel.cam-mini { width: 84px; opacity: .6; }
+#cam-panel.cam-hidden { width: 34px; opacity: .55; }
+#cam-panel.cam-hidden #cam-canvas { display: none; }
+#cam-panel.cam-hidden #cam-status {
+  overflow: hidden; white-space: nowrap;
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+#cam-panel.cam-hidden #cam-status::before { content: '📷'; }
 #cam-video { display: none; }
 #cam-canvas {
   width: 100%; border-radius: 10px;
-  border: 2px solid rgba(255, 255, 255, .35);
+  border: 2px solid rgba(255, 255, 255, .3);
   background: #000;
-  opacity: .92;
 }
 #cam-status {
-  font-size: 12px; padding: 3px 8px; margin-top: 2px;
+  font-size: 10px; padding: 2px 6px; margin-top: 2px;
   background: rgba(0, 0, 0, .55); border-radius: 8px;
   color: #ffd166;
+}
+
+/* ---------- touch controls (phones/tablets) ---------- */
+#touch-controls.hidden { display: none; }
+.tc {
+  position: absolute; bottom: 14px;
+  display: flex; gap: 12px; align-items: flex-end;
+  touch-action: none;
+}
+.tc-left { left: 12px; }
+.tc-right { right: 12px; }
+.tc-btn {
+  width: 62px; height: 62px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .5);
+  background: rgba(30, 25, 50, .55);
+  color: #fff; font-size: 24px;
+  touch-action: none;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tc-btn:active { background: rgba(255, 122, 60, .7); transform: scale(.94); }
+.tc-punch { background: rgba(214, 60, 30, .5); }
+.tc-kick { background: rgba(255, 179, 0, .45); }
+.tc-block { background: rgba(63, 184, 245, .45); }
+
+#rotate-hint {
+  display: none;
+  position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+  background: rgba(0, 0, 0, .75); color: #ffd166;
+  padding: 8px 18px; border-radius: 12px; font-size: 14px;
+  pointer-events: none; z-index: 5;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate-hint { display: block; }
 }
 
 #btn-quit {

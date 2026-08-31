@@ -65,6 +65,7 @@ class Fighter {
     this.hitDone = false; this.knockV = 0; this.stun = 0;
     this.walkDir = 1;
     this.dispHp = this.hp; this.ghostHp = this.hp;
+    this.trail = [];
   }
 
   get grounded() { return this.y <= 0.001; }
@@ -153,12 +154,14 @@ class Fighter {
       this.hp = 0;
       this.setState('ko');
       this.vy = 260; this.y = Math.max(this.y, 0.01);
+      game.koFlash = 1;
+      game.slowmo = 0.9;
       sfx.play('ko');
     }
   }
 
   // ---------- rendering ----------
-  draw(ctx) {
+  draw(ctx, refl) {
     const d = this.facing, c = this.ch;
     const s = c.build || 1;
     const base = FLOOR - this.y;
@@ -235,6 +238,28 @@ class Fighter {
         handF = { x: sho.x - d * 4, y: sho.y - 8 };
         handB = { x: sho.x - d * 22, y: sho.y };
         break;
+    }
+
+    // attack motion trail (accent-colored afterimages on the striking limb)
+    if (!refl) {
+      if (this.attacking && this.attackPhase().ext > 0.25) {
+        const pt = this.state === 'punch' ? handF : footF;
+        this.trail.push({ x: pt.x, y: pt.y });
+        if (this.trail.length > 7) this.trail.shift();
+      } else if (this.trail.length) {
+        this.trail.shift();  // fade out quickly after the attack ends
+      }
+    }
+    if (!refl && this.trail.length > 1) {
+      const ac = flash ? '#ffffff' : c.accent;
+      for (let i = 0; i < this.trail.length; i++) {
+        ctx.globalAlpha = ((i + 1) / this.trail.length) * 0.3;
+        ctx.fillStyle = ac;
+        ctx.beginPath();
+        ctx.arc(this.trail[i].x, this.trail[i].y, 3 + i * 1.6, 0, 7);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
 
     // joints via IK: knees bend toward facing, elbows drop down-back
@@ -371,6 +396,11 @@ export class Game {
     this.banner = null;
     this.hitstop = 0;   // brief freeze-frame on landed hits
     this.combo = null;  // { side, count, t }
+    this.cam = { x: W / 2, zoom: 1 };   // dynamic fight camera
+    this.koFlash = 0;
+    this.slowmo = 0;
+    this.animT = 0;
+    this.vignette = null;
 
     this.ai = { think: 0, move: 0, punch: false, kick: false, blockT: 0, jump: false };
     // Latest input received from the remote player (net-host mode).
@@ -396,8 +426,12 @@ export class Game {
   _tick(now) {
     if (!this.running) return;
     requestAnimationFrame((t) => this._tick(t));
-    const dt = Math.min(0.033, (now - this.lastT) / 1000);
+    const realDt = Math.min(0.033, (now - this.lastT) / 1000);
     this.lastT = now;
+    let dt = realDt;
+    if (this.slowmo > 0) { this.slowmo -= realDt; dt = realDt * 0.35; }  // KO slow-mo
+    this.animT += realDt;
+    if (this.koFlash > 0) this.koFlash -= realDt * 1.6;
     this.update(dt);
     this.draw();
   }
@@ -407,6 +441,7 @@ export class Game {
     this.shake *= Math.max(0, 1 - 10 * dt);
 
     this.particles.forEach(p => {
+      if (p.ring) { p.r += p.vr * dt; p.life -= dt; return; }
       p.x += p.vx * dt; p.y += p.vy * dt;
       p.vy += 900 * dt; p.life -= dt;
     });
@@ -519,6 +554,12 @@ export class Game {
   }
 
   spawnSparks(x, y, blocked) {
+    // impact shockwave ring
+    this.particles.push({
+      ring: true, x, y, r: 6, vr: blocked ? 240 : 380,
+      life: 0.32, max: 0.32,
+      color: blocked ? '127,212,255' : '255,214,150',
+    });
     const colors = blocked ? ['#7fd4ff', '#ffffff'] : ['#ffb347', '#ff5533', '#ffe14d', '#ffffff'];
     for (let i = 0; i < 14; i++) {
       const ang = Math.random() * Math.PI * 2, sp = 120 + Math.random() * 320;
@@ -571,7 +612,7 @@ export class Game {
           sfx.play('hit');
           this.spawnSparks(sf.x + (this.f[1 - i].x - sf.x) * 0.25, FLOOR - sf.y - 100, false);
           this.shake = 6;
-        } else if (sf.st === 'ko') sfx.play('ko');
+        } else if (sf.st === 'ko') { sfx.play('ko'); this.koFlash = 1; }
       }
       f.x = sf.x; f.y = sf.y; f.state = sf.st; f.t = sf.t;
       f.facing = sf.fc; f.hp = sf.hp;
@@ -634,21 +675,67 @@ export class Game {
   // ---------- rendering ----------
   draw() {
     const ctx = this.ctx;
+
+    // dynamic fight camera: zoom in when fighters are close, follow the midpoint
+    const spread = Math.abs(this.f[0].x - this.f[1].x);
+    const tz = clamp(1280 / (spread * 1.6 + 460), 1.0, 1.28);
+    this.cam.zoom += (tz - this.cam.zoom) * 0.05;
+    const visHalf = W / 2 / this.cam.zoom;
+    const tx = clamp((this.f[0].x + this.f[1].x) / 2, visHalf, W - visHalf);
+    this.cam.x += (tx - this.cam.x) * 0.07;
+
     ctx.save();
     if (this.shake > 0.3) {
       ctx.translate((Math.random() - 0.5) * this.shake * 2, (Math.random() - 0.5) * this.shake * 2);
     }
+    ctx.translate(W / 2, FLOOR);
+    ctx.scale(this.cam.zoom, this.cam.zoom);
+    ctx.translate(-this.cam.x, -FLOOR);
 
     this.drawBg(ctx);
+
+    // floor reflections
+    ctx.save();
+    ctx.translate(0, 2 * (FLOOR + 14));
+    ctx.scale(1, -1);
+    ctx.globalAlpha = 0.13;
+    this.f[1].draw(ctx, true);
+    this.f[0].draw(ctx, true);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+
     this.f[1].draw(ctx);
     this.f[0].draw(ctx);
 
     for (const p of this.particles) {
-      ctx.globalAlpha = Math.min(1, p.life * 4);
+      const a = Math.min(1, p.life * 4);
+      if (p.ring) {
+        ctx.strokeStyle = `rgba(${p.color},${(p.life / p.max) * 0.85})`;
+        ctx.lineWidth = 1 + (p.life / p.max) * 3.5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.stroke();
+        continue;
+      }
+      ctx.globalAlpha = a;
       ctx.fillStyle = p.color;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.fill();
     }
     ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // vignette (screen space, under the HUD)
+    if (!this.vignette) {
+      const v = document.createElement('canvas');
+      v.width = W; v.height = H;
+      const vc = v.getContext('2d');
+      const g = vc.createRadialGradient(W / 2, H * 0.42, H * 0.45, W / 2, H * 0.5, H * 0.95);
+      g.addColorStop(0, 'rgba(8,4,16,0)');
+      g.addColorStop(1, 'rgba(8,4,16,0.42)');
+      vc.fillStyle = g; vc.fillRect(0, 0, W, H);
+      this.vignette = v;
+    }
+    ctx.drawImage(this.vignette, 0, 0);
+
+    ctx.save();
 
     // combo counter
     if (this.combo && this.combo.count >= 2 && this.combo.t < 1.2) {
@@ -671,6 +758,12 @@ export class Game {
 
     this.drawHud(ctx);
     this.drawBanner(ctx);
+
+    // white flash on KO
+    if (this.koFlash > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${clamp(this.koFlash, 0, 1) * 0.75})`;
+      ctx.fillRect(0, 0, W, H);
+    }
     ctx.restore();
   }
 
@@ -691,12 +784,22 @@ export class Game {
     ctx.fillStyle = glow;
     ctx.beginPath(); ctx.arc(W * 0.79, 110, 130, 0, 7); ctx.fill();
 
-    // distant skyline silhouettes
-    ctx.fillStyle = '#141024';
+    // distant skyline silhouettes with flickering lit windows
     for (let i = 0; i < 9; i++) {
       const bw = 90 + ((i * 53) % 70);
       const bh = 70 + ((i * 97) % 130);
-      ctx.fillRect(i * 150 - 20, FLOOR - bh, bw, bh);
+      const bx = i * 150 - 20, by = FLOOR - bh;
+      ctx.fillStyle = '#141024';
+      ctx.fillRect(bx, by, bw, bh);
+      for (let r = 0; r < Math.floor(bh / 30); r++) {
+        for (let col = 0; col < Math.floor(bw / 26); col++) {
+          const seed = i * 13 + r * 7 + col * 5;
+          if (seed % 7 > 2) continue;   // most windows stay dark
+          const a = 0.28 + 0.22 * Math.sin(this.animT * 1.7 + seed);
+          ctx.fillStyle = `rgba(255,196,110,${Math.max(0.08, a)})`;
+          ctx.fillRect(bx + 10 + col * 26, by + 12 + r * 30, 9, 13);
+        }
+      }
     }
     // pagoda roof accent
     ctx.fillStyle = '#1c1430';
