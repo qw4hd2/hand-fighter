@@ -18,7 +18,14 @@
     <h1 class="logo">HAND<span>FIGHTER</span></h1>
     <p class="tagline">Fight with your hands — no controller, just your camera</p>
 
+    <canvas id="menu-demo" width="880" height="265"></canvas>
+    <div id="gesture-demo">
+      <span>✋ MOVE</span><span>☝️ JUMP</span><span>✊ PUNCH</span><span>✌️ KICK</span><span>🤟 BLOCK</span>
+    </div>
+
     <div class="menu-buttons">
+      <button id="btn-quick" class="big-btn">⚡ QUICK PLAY <small>instant fight</small></button>
+      <button id="btn-arcade" class="big-btn">ARCADE <small>beat all 6 fighters</small></button>
       <button id="btn-1p" class="big-btn">1 PLAYER <small>vs CPU</small></button>
       <button id="btn-2p" class="big-btn">2 PLAYERS <small>same camera</small></button>
       <button id="btn-online" class="big-btn">ONLINE MATCH <small>play over the internet</small></button>
@@ -53,6 +60,11 @@
       </div>
       <div class="setup-panel" id="panel-p2">
         <h3 id="panel-p2-title">Player 2</h3>
+        <div id="arcade-info" class="hidden">
+          🏆 Fight all <b>six fighters</b> one after another.<br>
+          Difficulty rises with every victory.<br>
+          Lose once and the run is over!
+        </div>
         <div id="difficulty-row" class="hidden">
           <button class="diff-btn" data-d="easy">EASY</button>
           <button class="diff-btn" data-d="normal">NORMAL</button>
@@ -122,6 +134,7 @@
       <div id="rotate-hint">🔄 rotate your phone sideways for the best view</div>
 
       <div id="end-buttons" class="hidden">
+        <button id="btn-next" class="big-btn hidden">NEXT OPPONENT ▶</button>
         <button id="btn-rematch" class="big-btn">REMATCH</button>
         <button id="btn-share" class="small-btn">🔗 Copy game link</button>
         <button id="btn-newfighters" class="small-btn">Change fighters</button>
