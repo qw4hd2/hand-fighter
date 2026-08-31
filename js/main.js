@@ -98,7 +98,8 @@ function enterFightUi() {
   sfx.setMuted(soundMuted());
   sfx.startMusic();
   CG.gameplayStart();
-  if (IS_TOUCH) {
+  // Portals provide their own fullscreen — custom fullscreen is prohibited there.
+  if (IS_TOUCH && !CG.active) {
     // best-effort fullscreen landscape on phones; ignore if the browser refuses
     try {
       const p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
@@ -352,6 +353,16 @@ function quitToMenu() {
 }
 
 // ---------- buttons ----------
+// One click from menu to gameplay (CrazyGames onboarding requirement)
+$('btn-quick').addEventListener('click', () => {
+  sfx.unlock();
+  state.mode = 'cpu';
+  state.chars[0] = (Math.random() * CHARACTERS.length) | 0;
+  state.chars[1] = (state.chars[0] + 1 + ((Math.random() * (CHARACTERS.length - 1)) | 0)) % CHARACTERS.length;
+  if (!localStorage.getItem('hf-diff')) state.difficulty = 'easy';   // gentle first fight
+  startFight();
+});
+
 $('btn-arcade').addEventListener('click', () => {
   sfx.unlock();
   state.arcade = { stage: 0 };
