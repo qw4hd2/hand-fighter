@@ -5,6 +5,7 @@ import { Controls } from './input.js';
 import { HandTracker } from './hands.js';
 import { NetSession, genCode } from './net.js';
 import { sfx } from './sfx.js';
+import { CG } from './cg.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -85,6 +86,7 @@ function enterFightUi() {
   $('touch-controls').classList.toggle('hidden', !IS_TOUCH);
   sfx.setMuted(soundMuted());
   sfx.startMusic();
+  CG.gameplayStart();
   if (IS_TOUCH) {
     // best-effort fullscreen landscape on phones; ignore if the browser refuses
     try {
@@ -119,6 +121,7 @@ function startTracker(twoPlayerCam) {
 }
 
 function stopFight() {
+  CG.gameplayStop();
   sfx.stopMusic();
   if (state.game) { state.game.destroy(); state.game = null; }
   if (state.controls) { state.controls.destroy(); state.controls = null; }
@@ -183,6 +186,9 @@ function netHandlers(role) {
       $('room-code').textContent = code;
       $('room-code-box').classList.remove('hidden');
       $('online-status').textContent = 'room open — waiting for your partner…';
+      const inv = CG.inviteUrl(code);
+      state.inviteUrl = inv;
+      $('btn-invite').classList.toggle('hidden', !inv);
     },
     onConnected: () => {
       if (role === 'guest') {
@@ -258,6 +264,8 @@ function recreateOnlineGame() {
   if (!state.onlineCfg) return;
   if (state.game) state.game.destroy();
   $('end-buttons').classList.add('hidden');
+  CG.gameplayStart();
+  sfx.startMusic();
   state.game = new Game($('game-canvas'), state.onlineCfg, state.controls, {
     onMatchEnd: () => showEndButtons(),
   });
@@ -273,6 +281,9 @@ function onNetLost() {
 }
 
 function showEndButtons() {
+  CG.gameplayStop();
+  CG.happytime();
+  state.matchEnded = true;
   $('end-buttons').classList.remove('hidden');
   const online = !!state.role;
   // Guests can't restart the match — the host drives it.
@@ -281,9 +292,17 @@ function showEndButtons() {
 }
 
 function quitToMenu() {
-  cleanupNet();
-  stopFight();
-  showScreen('menu-screen');
+  const afterAd = () => {
+    cleanupNet();
+    stopFight();
+    showScreen('menu-screen');
+  };
+  if (state.matchEnded) {
+    state.matchEnded = false;
+    CG.midgameAd(sfx, afterAd);   // natural break: ad after a finished match
+  } else {
+    afterAd();
+  }
 }
 
 // ---------- buttons ----------
@@ -296,13 +315,16 @@ $('btn-quit').addEventListener('click', quitToMenu);
 $('btn-menu2').addEventListener('click', quitToMenu);
 $('btn-newfighters').addEventListener('click', () => { stopFight(); openSetup(state.mode); });
 $('btn-rematch').addEventListener('click', () => {
-  if (state.role === 'host') {
-    state.net.send({ t: 'rematch' });
-    recreateOnlineGame();
-  } else {
-    stopFight();
-    startFight();
-  }
+  state.matchEnded = false;
+  CG.midgameAd(sfx, () => {      // natural break: ad between matches
+    if (state.role === 'host') {
+      if (state.net) state.net.send({ t: 'rematch' });
+      recreateOnlineGame();
+    } else {
+      stopFight();
+      startFight();
+    }
+  });
 });
 $('btn-online-back').addEventListener('click', () => { cleanupNet(); showScreen('menu-screen'); });
 $('btn-create').addEventListener('click', () => {
@@ -349,6 +371,27 @@ $('btn-share').addEventListener('click', () => {
   };
   if (navigator.clipboard) navigator.clipboard.writeText(url).then(done).catch(() => {});
   else done();
+});
+
+// CrazyGames invite link (only visible when playing on crazygames.com)
+$('btn-invite').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (state.inviteUrl && navigator.clipboard) {
+    navigator.clipboard.writeText(state.inviteUrl).then(() => {
+      $('btn-invite').textContent = '✓ Invite link copied!';
+      setTimeout(() => { $('btn-invite').textContent = '🔗 Copy invite link'; }, 1800);
+    }).catch(() => {});
+  }
+});
+
+// initialize the CrazyGames SDK (no-op elsewhere) and honor invite links
+CG.init().then(() => {
+  const room = CG.inviteParam();
+  if (room) {
+    openOnline();
+    $('join-code').value = String(room).toUpperCase().slice(0, 4);
+    $('online-status').textContent = 'invite received — click JOIN to enter the room';
+  }
 });
 
 // on-screen touch buttons drive the local player
