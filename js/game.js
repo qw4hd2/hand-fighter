@@ -46,6 +46,59 @@ function disc(ctx, p, r, color) {
   ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
 }
 
+// --- cel-shading system --------------------------------------------------
+function pcol(str) {
+  if (str[0] === '#') {
+    const n = parseInt(str.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  const m = str.match(/\d+/g);
+  return m ? [+m[0], +m[1], +m[2]] : [255, 0, 255];
+}
+const cssc = (c) => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+const mix2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const OUTLINE = [26, 17, 31];
+
+// One depth layer: a union outline pass, then a shaded fill pass, so parts in
+// the same layer merge into one silhouette while layers separate cleanly.
+// part: {a,b,w,c} = stroked segment, {p,r,c} = disc.
+function drawLayer(ctx, parts, flash) {
+  ctx.lineCap = 'round';
+  const oc = cssc(flash ? [205, 205, 215] : OUTLINE);
+  ctx.strokeStyle = oc; ctx.fillStyle = oc;
+  for (const p of parts) {
+    if (p.r !== undefined) {
+      ctx.beginPath(); ctx.arc(p.p.x, p.p.y, p.r + 1.9, 0, 7); ctx.fill();
+    } else {
+      ctx.lineWidth = p.w + 3.8;
+      ctx.beginPath(); ctx.moveTo(p.a.x, p.a.y); ctx.lineTo(p.b.x, p.b.y); ctx.stroke();
+    }
+  }
+  for (const p of parts) {
+    const col = flash ? [255, 255, 255] : p.c;
+    if (p.r !== undefined) {
+      const g = ctx.createRadialGradient(
+        p.p.x - p.r * 0.35, p.p.y - p.r * 0.45, p.r * 0.1,
+        p.p.x, p.p.y, p.r * 1.05);
+      g.addColorStop(0, cssc(mix2(col, [255, 255, 255], 0.28)));
+      g.addColorStop(0.62, cssc(col));
+      g.addColorStop(1, cssc(mix2(col, OUTLINE, 0.32)));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.p.x, p.p.y, p.r, 0, 7); ctx.fill();
+    } else {
+      const dx = p.b.x - p.a.x, dy = p.b.y - p.a.y, len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len;
+      const mx = (p.a.x + p.b.x) / 2, my = (p.a.y + p.b.y) / 2, hw = p.w / 2;
+      const g = ctx.createLinearGradient(mx + nx * hw, my + ny * hw, mx - nx * hw, my - ny * hw);
+      g.addColorStop(0, cssc(mix2(col, [255, 255, 255], 0.24)));
+      g.addColorStop(0.55, cssc(col));
+      g.addColorStop(1, cssc(mix2(col, OUTLINE, 0.34)));
+      ctx.strokeStyle = g; ctx.lineWidth = p.w;
+      ctx.beginPath(); ctx.moveTo(p.a.x, p.a.y); ctx.lineTo(p.b.x, p.b.y); ctx.stroke();
+    }
+  }
+}
+
 export class Fighter {
   constructor(cfg, side) {
     this.name = cfg.name;
@@ -271,51 +324,67 @@ export class Fighter {
     const elbF = ik(shoF, handF, uarm, farm, d);
     const elbB = ik(shoB, handB, uarm, farm, d);
 
-    // ===== back arm (skin, darker)
-    seg(ctx, shoB, elbB, 11 * s, skinD);
-    seg(ctx, elbB, handB, 9 * s, skinD);
-    disc(ctx, handB, 7 * s, gloveD);
+    // ============== cel-shaded layered rendering ==============
+    const CP = {
+      skin: pcol(c.skin), pants: pcol(c.pants), glove: pcol(c.glove),
+      hairC: pcol(c.hair), acc: pcol(c.accent),
+      torso: pcol(c.top ? c.top : c.skin),
+    };
+    const backOf = (col) => mix2(col, OUTLINE, 0.3);   // rear limbs sit in shadow
+    const SHOE = [51, 42, 61], SHOE_B = [36, 29, 45];
 
-    // ===== back leg
-    seg(ctx, hip, kneeB, 15 * s, pantsD);
-    seg(ctx, kneeB, footB, 12 * s, pantsD);
-    seg(ctx, { x: footB.x - d * 3, y: footB.y - 3 }, { x: footB.x + d * 8, y: footB.y - 2 }, 10 * s, F('#26202e'));
+    // layer 1: back arm
+    drawLayer(ctx, [
+      { a: shoB, b: elbB, w: 11 * s, c: backOf(CP.skin) },
+      { a: elbB, b: handB, w: 9 * s, c: backOf(CP.skin) },
+      { p: handB, r: 7.2 * s, c: backOf(CP.glove) },
+    ], flash);
 
-    // ===== torso (tapered: narrow waist, broad chest)
+    // layer 2: back leg
+    drawLayer(ctx, [
+      { a: hip, b: kneeB, w: 15 * s, c: backOf(CP.pants) },
+      { a: kneeB, b: footB, w: 12 * s, c: backOf(CP.pants) },
+      { a: { x: footB.x - d * 3, y: footB.y - 3 }, b: { x: footB.x + d * 9, y: footB.y - 2 }, w: 10 * s, c: SHOE_B },
+    ], flash);
+
+    // layer 3: torso + neck + head as one united silhouette
     const midT = { x: (hip.x + chest.x) / 2, y: (hip.y + chest.y) / 2 };
-    seg(ctx, hip, midT, 22 * s, torsoColD);
-    seg(ctx, midT, chest, 29 * s, torsoCol);
+    const hx = chest.x + d * 4 + lean * 0.2, hy = chest.y - 26 * s;
+    drawLayer(ctx, [
+      { a: hip, b: midT, w: 23 * s, c: mix2(CP.torso, OUTLINE, 0.12) },
+      { a: midT, b: chest, w: 30 * s, c: CP.torso },
+      { a: chest, b: { x: hx, y: hy + 10 }, w: 9 * s, c: CP.skin },
+      { p: { x: hx, y: hy }, r: 15.5 * s, c: CP.skin },
+    ], flash);
+
+    // muscle hints on bare torsos
     if (!c.top && !flash) {
-      // pec + ab hints on bare torsos
-      ctx.globalAlpha = 0.35;
-      ctx.strokeStyle = skinD; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.3;
+      ctx.strokeStyle = cssc(mix2(CP.skin, OUTLINE, 0.5)); ctx.lineWidth = 2; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.arc(chest.x + d * 7, chest.y + 10, 5 * s, 0.3, Math.PI - 0.5); ctx.stroke();
       ctx.beginPath(); ctx.arc(chest.x - d * 3, chest.y + 11, 4.5 * s, 0.3, Math.PI - 0.5); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(hip.x - 5 * s, midT.y + 4); ctx.lineTo(hip.x + 5 * s, midT.y + 4); ctx.stroke();
       ctx.globalAlpha = 1;
     }
     // belt
-    seg(ctx, { x: hip.x - 14 * s, y: hip.y - 3 }, { x: hip.x + 14 * s, y: hip.y - 3 }, 7, accent);
+    seg(ctx, { x: hip.x - 14 * s, y: hip.y - 3 }, { x: hip.x + 14 * s, y: hip.y - 3 }, 7,
+        flash ? '#fff' : cssc(CP.acc));
 
-    // ===== front leg (outlined against the back leg)
-    seg(ctx, hip, kneeF, 15 * s + 3, F(shade(c.pants, 0.4)));
-    seg(ctx, kneeF, footF, 12 * s + 3, F(shade(c.pants, 0.4)));
-    seg(ctx, hip, kneeF, 15 * s, pants);
-    seg(ctx, kneeF, footF, 12 * s, pants);
-    disc(ctx, kneeF, 7 * s, pants);
-    seg(ctx, { x: footF.x - d * 3, y: footF.y - 3 }, { x: footF.x + d * 9, y: footF.y - 2 }, 10 * s, F('#332a3d'));
+    // jaw shading + ear
+    if (!flash) {
+      ctx.globalAlpha = 0.3;
+      ctx.strokeStyle = cssc(mix2(CP.skin, OUTLINE, 0.5)); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(hx, hy + 3, 12 * s, 0.5, Math.PI - 0.5); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = cssc(mix2(CP.skin, OUTLINE, 0.18));
+      ctx.beginPath(); ctx.arc(hx - d * 11 * s, hy + 1, 3.4 * s, 0, 7); ctx.fill();
+    }
 
-    // ===== head
-    const hx = chest.x + d * 4 + lean * 0.2, hy = chest.y - 26 * s;
-    seg(ctx, chest, { x: hx, y: hy + 10 }, 9 * s, skin);            // neck
-    disc(ctx, { x: hx, y: hy }, 15 * s, skin);
-    ctx.globalAlpha = 0.35;
-    ctx.strokeStyle = skinD; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(hx, hy + 3, 12 * s, 0.5, Math.PI - 0.5); ctx.stroke(); // jaw hint
-    ctx.globalAlpha = 1;
-
-    // hair
-    ctx.fillStyle = hair;
+    // hair: solid shapes with their own outline
+    const hairFill = flash ? '#ffffff' : cssc(CP.hairC);
+    const hairEdge = flash ? '#dddddd' : cssc(mix2(CP.hairC, OUTLINE, 0.55));
+    ctx.fillStyle = hairFill; ctx.strokeStyle = hairEdge;
+    ctx.lineWidth = 2.6; ctx.lineJoin = 'round';
     if (c.hairStyle === 'spiky') {
       ctx.beginPath();
       ctx.moveTo(hx - 14 * s, hy - 5);
@@ -324,34 +393,52 @@ export class Fighter {
         ctx.lineTo(px, hy - (23 + (i % 2) * 8) * s);
         ctx.lineTo(hx - 14 * s + (i + 1) * (28 * s / 5), hy - 8 * s);
       }
-      ctx.closePath(); ctx.fill();
+      ctx.closePath(); ctx.fill(); ctx.stroke();
     } else if (c.hairStyle === 'mohawk') {
       ctx.beginPath();
       ctx.moveTo(hx - 4 * s, hy - 10 * s);
       ctx.quadraticCurveTo(hx, hy - 30 * s, hx + 6 * s, hy - 10 * s);
-      ctx.closePath(); ctx.fill();
+      ctx.closePath(); ctx.fill(); ctx.stroke();
     } else if (c.hairStyle === 'buzz') {
-      ctx.beginPath(); ctx.arc(hx, hy - 2, 14.5 * s, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(hx, hy - 2, 14.5 * s, Math.PI, Math.PI * 2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
     } else if (c.hairStyle === 'ponytail') {
-      ctx.beginPath(); ctx.arc(hx, hy - 2, 15 * s, Math.PI, Math.PI * 2); ctx.fill();
       const sway = Math.sin(this.anim * 5) * 5;
-      ctx.strokeStyle = hair; ctx.lineWidth = 7; ctx.lineCap = 'round';
+      ctx.lineWidth = 10; ctx.strokeStyle = hairEdge; ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(hx - d * 10 * s, hy - 10);
       ctx.quadraticCurveTo(hx - d * 24 * s, hy + 2 + sway, hx - d * 27 * s, hy + 24 - sway);
       ctx.stroke();
+      ctx.lineWidth = 7; ctx.strokeStyle = hairFill;
+      ctx.beginPath();
+      ctx.moveTo(hx - d * 10 * s, hy - 10);
+      ctx.quadraticCurveTo(hx - d * 24 * s, hy + 2 + sway, hx - d * 27 * s, hy + 24 - sway);
+      ctx.stroke();
+      ctx.lineWidth = 2.6; ctx.strokeStyle = hairEdge;
+      ctx.beginPath(); ctx.arc(hx, hy - 2, 15 * s, Math.PI, Math.PI * 2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
     } else if (c.hairStyle === 'topknot') {
-      ctx.beginPath(); ctx.arc(hx, hy - 2, 14.5 * s, Math.PI, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(hx, hy - 19 * s, 5.5 * s, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(hx, hy - 2, 14.5 * s, Math.PI, Math.PI * 2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx, hy - 19 * s, 5.5 * s, 0, 7); ctx.fill(); ctx.stroke();
     } else if (!flash) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';                    // bald shine
       ctx.beginPath(); ctx.arc(hx - d * 4, hy - 8, 3.5, 0, 7); ctx.fill();
     }
 
-    // headband + fluttering tail (ribbon trails behind and below the head)
-    seg(ctx, { x: hx - 13 * s, y: hy - 4 }, { x: hx + 13 * s, y: hy - 4 }, 5, accent);
+    // headband + fluttering ribbon (outlined)
+    const accCss = flash ? '#ffffff' : cssc(CP.acc);
+    const accEdge = flash ? '#dddddd' : cssc(mix2(CP.acc, OUTLINE, 0.5));
+    seg(ctx, { x: hx - 13 * s, y: hy - 4 }, { x: hx + 13 * s, y: hy - 4 }, 7.6, accEdge);
+    seg(ctx, { x: hx - 13 * s, y: hy - 4 }, { x: hx + 13 * s, y: hy - 4 }, 5, accCss);
     const fl = Math.sin(this.anim * 7) * 4;
-    ctx.strokeStyle = accent; ctx.lineWidth = 3.5;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = accEdge; ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(hx - d * 12 * s, hy - 2);
+    ctx.quadraticCurveTo(hx - d * 24 * s, hy + 5 + fl, hx - d * 31 * s, hy + 15 - fl);
+    ctx.stroke();
+    ctx.strokeStyle = accCss; ctx.lineWidth = 3.5;
     ctx.beginPath();
     ctx.moveTo(hx - d * 12 * s, hy - 2);
     ctx.quadraticCurveTo(hx - d * 24 * s, hy + 5 + fl, hx - d * 31 * s, hy + 15 - fl);
@@ -359,31 +446,41 @@ export class Fighter {
 
     // beard (old-master style)
     if (c.beard && !flash) {
-      ctx.fillStyle = hair;
+      ctx.fillStyle = hairFill; ctx.strokeStyle = hairEdge; ctx.lineWidth = 2.4;
       ctx.beginPath();
       ctx.arc(hx + d * 1, hy + 6, 11 * s, 0.12 * Math.PI, 0.88 * Math.PI);
-      ctx.closePath(); ctx.fill();
+      ctx.closePath(); ctx.fill(); ctx.stroke();
     }
 
-    // face: angry brow, eye, mouth
-    ctx.strokeStyle = F('#221a24'); ctx.lineWidth = 2.6; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(hx + d * 2.5, hy - 8); ctx.lineTo(hx + d * 11, hy - 5); ctx.stroke();
-    disc(ctx, { x: hx + d * 7.5, y: hy - 1.5 }, 2.9, F('#f4f0ff'));
-    disc(ctx, { x: hx + d * 8.4, y: hy - 1.5 }, 1.6, F('#221a24'));
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(hx + d * 4, hy + 7.5); ctx.lineTo(hx + d * 10, hy + 6.8); ctx.stroke();
+    // face: heavy angry brow, bright eye with glint, nose, grim mouth
+    const inkCss = flash ? '#ffffff' : cssc(OUTLINE);
+    ctx.strokeStyle = inkCss; ctx.lineWidth = 3.1; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(hx + d * 2, hy - 8.5); ctx.lineTo(hx + d * 11.5, hy - 5); ctx.stroke();
+    disc(ctx, { x: hx + d * 7.5, y: hy - 1.5 }, 3.1, flash ? '#ffffff' : '#f4f0ff');
+    disc(ctx, { x: hx + d * 8.4, y: hy - 1.2 }, 1.7, inkCss);
+    if (!flash) disc(ctx, { x: hx + d * 7.8, y: hy - 2.2 }, 0.7, '#ffffff');
+    ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(hx + d * 12.5, hy + 2.5); ctx.lineTo(hx + d * 11, hy + 4); ctx.stroke();
+    ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(hx + d * 4, hy + 7.8); ctx.lineTo(hx + d * 10, hy + 6.9); ctx.stroke();
 
-    // ===== front arm + glove (outlined so it reads against the torso)
-    const outl = F(shade(c.skin, 0.45));
-    seg(ctx, shoF, elbF, 11 * s + 3, outl);
-    seg(ctx, elbF, handF, 9 * s + 3, outl);
-    seg(ctx, shoF, elbF, 11 * s, skin);
-    seg(ctx, elbF, handF, 9 * s, skin);
-    disc(ctx, shoF, 8 * s, torsoCol);                              // deltoid
+    // layer 4: front leg
+    drawLayer(ctx, [
+      { a: hip, b: kneeF, w: 15 * s, c: CP.pants },
+      { a: kneeF, b: footF, w: 12 * s, c: CP.pants },
+      { p: kneeF, r: 6.5 * s, c: CP.pants },
+      { a: { x: footF.x - d * 3, y: footF.y - 3 }, b: { x: footF.x + d * 10, y: footF.y - 2 }, w: 10 * s, c: SHOE },
+    ], flash);
+
+    // layer 5: front arm + glove (chunky fist with thumb knuckle)
     const punching = this.state === 'punch' && ext > 0.5;
-    disc(ctx, handF, (punching ? 9.5 : 8) * s, glove);
-    ctx.strokeStyle = gloveD; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(handF.x, handF.y, (punching ? 9.5 : 8) * s, 0, 7); ctx.stroke();
+    drawLayer(ctx, [
+      { a: shoF, b: elbF, w: 11 * s, c: CP.skin },
+      { a: elbF, b: handF, w: 9 * s, c: CP.skin },
+      { p: shoF, r: 8 * s, c: CP.torso },
+      { p: handF, r: (punching ? 9.6 : 8.2) * s, c: CP.glove },
+      { p: { x: handF.x - d * 3.5 * s, y: handF.y + 4.5 * s }, r: 4.4 * s, c: CP.glove },
+    ], flash);
 
     // strike glow on active frames
     if (this.attacking && this.attackPhase().active) {
