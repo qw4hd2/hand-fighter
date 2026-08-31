@@ -46,7 +46,7 @@ function disc(ctx, p, r, color) {
   ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
 }
 
-class Fighter {
+export class Fighter {
   constructor(cfg, side) {
     this.name = cfg.name;
     this.ch = cfg.ch;

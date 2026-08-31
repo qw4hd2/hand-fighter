@@ -25,6 +25,25 @@ body {
 .logo span { color: #ff5533; }
 .tagline { opacity: .75; margin: 10px 0 34px; font-size: 17px; }
 
+#menu-demo {
+  width: min(92vw, 760px); height: auto;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, .14);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+  margin-bottom: 10px;
+}
+#gesture-demo {
+  display: flex; gap: 18px; flex-wrap: wrap; justify-content: center;
+  margin-bottom: 26px; font-size: 15px; font-weight: bold;
+}
+#gesture-demo span {
+  opacity: .45; letter-spacing: 1px;
+  transition: opacity .25s, transform .25s, color .25s;
+}
+#gesture-demo span.on {
+  opacity: 1; transform: scale(1.22); color: #ffd166;
+}
+
 .menu-buttons { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; }
 
 .big-btn {

@@ -6,6 +6,7 @@ import { HandTracker } from './hands.js';
 import { NetSession, genCode } from './net.js';
 import { sfx } from './sfx.js';
 import { CG } from './cg.js';
+import { startMenuDemo } from './menudemo.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -388,6 +389,17 @@ $('btn-invite').addEventListener('click', (e) => {
     }).catch(() => {});
   }
 });
+
+// live sparring demo + gesture cycle on the menu
+startMenuDemo($('menu-demo'), () => $('menu-screen').classList.contains('active'));
+{
+  const chips = document.querySelectorAll('#gesture-demo span');
+  let gi = 0;
+  setInterval(() => {
+    chips.forEach((c, i) => c.classList.toggle('on', i === gi % chips.length));
+    gi++;
+  }, 950);
+}
 
 // initialize the CrazyGames SDK (no-op elsewhere), honor invite links and
 // instant-multiplayer launches (party leaders land straight in a lobby)
