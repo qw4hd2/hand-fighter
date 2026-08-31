@@ -191,6 +191,9 @@ function netHandlers(role) {
       state.inviteUrl = inv;
       $('btn-invite').classList.toggle('hidden', !inv);
       CG.showInviteButton(code);
+      CG.pokiShareUrl(code).then((u) => {
+        if (u) { state.inviteUrl = u; $('btn-invite').classList.remove('hidden'); }
+      });
     },
     onConnected: () => {
       if (role === 'guest') {
