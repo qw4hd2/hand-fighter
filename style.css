@@ -148,6 +148,7 @@ body {
 /* ---------- game ---------- */
 #game-screen { padding: 12px; }
 #game-wrap { position: relative; width: min(96vw, 1280px); }
+#game-wrap { width: min(96vw, 172vh, 1280px); }
 #game-canvas {
   width: 100%; height: auto; display: block;
   border-radius: 14px;
@@ -220,7 +221,7 @@ body {
   #rotate-hint { display: block; }
 }
 
-#btn-quit {
+#btn-quit, #btn-mute {
   position: absolute; top: 10px; right: 10px;
   width: 38px; height: 38px; border-radius: 50%;
   background: rgba(0, 0, 0, .5); color: #fff;
@@ -228,6 +229,31 @@ body {
   font-size: 16px; cursor: pointer;
 }
 #btn-quit:hover { background: rgba(214, 60, 30, .8); }
+#btn-mute { right: 56px; font-size: 15px; }
+#btn-mute:hover { background: rgba(255, 255, 255, .2); }
+
+/* ---------- setup extras ---------- */
+#difficulty-row { display: flex; gap: 8px; margin-bottom: 12px; }
+#difficulty-row.hidden { display: none; }
+.diff-btn {
+  flex: 1; padding: 8px 0; font-size: 13px; letter-spacing: 1px;
+  background: rgba(255, 255, 255, .07); color: #cfcbe0;
+  border: 2px solid rgba(255, 255, 255, .2); border-radius: 8px;
+  cursor: pointer; font-weight: bold;
+}
+.diff-btn.selected {
+  background: rgba(255, 122, 60, .25); color: #ffd166;
+  border-color: #ffd166;
+}
+.opt-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; color: #cfcbe0; cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+}
+.opt-label input { width: 17px; height: 17px; accent-color: #ff7a3c; }
+#privacy-note {
+  margin-top: 22px; font-size: 12px; opacity: .55; max-width: 640px; text-align: center;
+}
 
 #end-buttons {
   position: absolute; left: 50%; top: 62%; transform: translateX(-50%);

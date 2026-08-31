@@ -11,6 +11,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   mode: 'cpu',            // 'cpu' | '2p' | 'online'
   chars: [0, 1],          // selected character index per player
+  difficulty: localStorage.getItem('hf-diff') || 'normal',
   game: null,
   controls: null,
   tracker: null,
@@ -19,6 +20,9 @@ const state = {
   role: null,             // 'host' | 'guest' when online
   onlineCfg: null,        // cached fight config for online rematches
 };
+
+const handsEnabled = () => localStorage.getItem('hf-hands') !== '0';
+const soundMuted = () => localStorage.getItem('hf-mute') === '1';
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -48,8 +52,16 @@ function buildCards(container, player) {
   });
 }
 
+function renderDifficulty() {
+  document.querySelectorAll('.diff-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.d === state.difficulty);
+  });
+}
+
 function openSetup(mode) {
   state.mode = mode;
+  $('difficulty-row').classList.toggle('hidden', mode !== 'cpu');
+  renderDifficulty();
   if (mode === 'cpu') {
     $('panel-p2-title').textContent = 'CPU Opponent';
     $('name-p2').value = 'CPU';
@@ -71,6 +83,8 @@ function enterFightUi() {
   showScreen('game-screen');
   $('end-buttons').classList.add('hidden');
   $('touch-controls').classList.toggle('hidden', !IS_TOUCH);
+  sfx.setMuted(soundMuted());
+  sfx.startMusic();
   if (IS_TOUCH) {
     // best-effort fullscreen landscape on phones; ignore if the browser refuses
     try {
@@ -85,6 +99,12 @@ function enterFightUi() {
 }
 
 function startTracker(twoPlayerCam) {
+  if (!handsEnabled()) {
+    $('cam-status').textContent = 'hand tracking off — keys / touch';
+    $('cam-panel').className = 'cam-hidden';
+    return;
+  }
+  $('cam-panel').className = CAM_MODES[camMode] || '';
   state.tracker = new HandTracker({
     video: $('cam-video'),
     canvas: $('cam-canvas'),
@@ -99,6 +119,7 @@ function startTracker(twoPlayerCam) {
 }
 
 function stopFight() {
+  sfx.stopMusic();
   if (state.game) { state.game.destroy(); state.game = null; }
   if (state.controls) { state.controls.destroy(); state.controls = null; }
   if (state.tracker) { state.tracker.stop(); state.tracker = null; }
@@ -118,6 +139,7 @@ function startFight() {
   const ch2 = CHARACTERS[state.chars[1]];
   const cfg = {
     mode: state.mode,
+    difficulty: state.difficulty,
     p1: { name: $('name-p1').value.trim() || 'Player 1', ch: ch1 },
     p2: { name: state.mode === 'cpu' ? `CPU ${ch2.name}` : ($('name-p2').value.trim() || 'Player 2'), ch: ch2 },
   };
@@ -293,6 +315,42 @@ $('btn-create').addEventListener('click', () => {
 $('join-code').addEventListener('input', (e) => {
   e.target.value = e.target.value.replace(/\s+/g, '').toUpperCase();
 });
+// difficulty selector (1P vs CPU)
+document.querySelectorAll('.diff-btn').forEach((b) => {
+  b.addEventListener('click', () => {
+    state.difficulty = b.dataset.d;
+    localStorage.setItem('hf-diff', state.difficulty);
+    renderDifficulty();
+  });
+});
+
+// hand-tracking opt-out (persisted)
+$('opt-hands').checked = handsEnabled();
+$('opt-hands').addEventListener('change', (e) => {
+  localStorage.setItem('hf-hands', e.target.checked ? '1' : '0');
+});
+
+// mute toggle (persisted)
+function renderMute() { $('btn-mute').textContent = soundMuted() ? '🔇' : '🔊'; }
+renderMute();
+$('btn-mute').addEventListener('click', () => {
+  localStorage.setItem('hf-mute', soundMuted() ? '0' : '1');
+  sfx.setMuted(soundMuted());
+  if (!soundMuted()) { sfx.unlock(); sfx.startMusic(); }
+  renderMute();
+});
+
+// share button — copy the game link to challenge friends
+$('btn-share').addEventListener('click', () => {
+  const url = location.origin + location.pathname;
+  const done = () => {
+    $('btn-share').textContent = '✓ Link copied!';
+    setTimeout(() => { $('btn-share').textContent = '🔗 Copy game link'; }, 1800);
+  };
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(done).catch(() => {});
+  else done();
+});
+
 // on-screen touch buttons drive the local player
 document.querySelectorAll('#touch-controls .tc-btn').forEach((btn) => {
   const k = btn.dataset.k;

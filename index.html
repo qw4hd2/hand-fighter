@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hand Fighter</title>
+  <title>Hand Fighter — fight with your hands via webcam</title>
+  <meta name="description" content="A free browser fighting game controlled by your hands through the webcam. Punch, kick and block with gestures — vs CPU, 2 players on one camera, or online with a friend. Works with keyboard and touch too.">
+  <meta property="og:title" content="Hand Fighter 🥊">
+  <meta property="og:description" content="Fight with your hands — no controller, just your camera. Play vs CPU or challenge a friend online.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥊</text></svg>">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -34,6 +39,7 @@
         <div><b>P2:</b> ← / → move · ↑ jump · ↓ block · K punch · L kick</div>
       </div>
     </div>
+    <p id="privacy-note">🔒 Your camera is processed entirely on your device — no video is ever uploaded, stored, or shared.</p>
   </section>
 
   <!-- ============ CHARACTER SELECT ============ -->
@@ -47,6 +53,11 @@
       </div>
       <div class="setup-panel" id="panel-p2">
         <h3 id="panel-p2-title">Player 2</h3>
+        <div id="difficulty-row" class="hidden">
+          <button class="diff-btn" data-d="easy">EASY</button>
+          <button class="diff-btn" data-d="normal">NORMAL</button>
+          <button class="diff-btn" data-d="hard">HARD</button>
+        </div>
         <input id="name-p2" type="text" maxlength="14" placeholder="Enter your name" value="Player 2">
         <div class="char-cards" id="cards-p2"></div>
       </div>
@@ -54,6 +65,7 @@
     <div class="setup-actions">
       <button id="btn-back" class="small-btn">← Back</button>
       <button id="btn-fight" class="big-btn fight-btn">FIGHT!</button>
+      <label class="opt-label"><input type="checkbox" id="opt-hands" checked> 🖐 hand tracking (webcam)</label>
     </div>
   </section>
 
@@ -110,10 +122,12 @@
 
       <div id="end-buttons" class="hidden">
         <button id="btn-rematch" class="big-btn">REMATCH</button>
+        <button id="btn-share" class="small-btn">🔗 Copy game link</button>
         <button id="btn-newfighters" class="small-btn">Change fighters</button>
         <button id="btn-menu2" class="small-btn">Main menu</button>
       </div>
 
+      <button id="btn-mute" title="Sound on/off">🔊</button>
       <button id="btn-quit" title="Quit to menu">✕</button>
     </div>
   </section>

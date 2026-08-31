@@ -34,4 +34,20 @@ export const CHARACTERS = [
     speed: 0.88, power: 1.28, hp: 96,
     desc: 'Heavy hitter',
   },
+  {
+    id: 'kira', name: 'Kira',
+    color: '#ff5fa2', accent: '#2de1c2',
+    skin: '#f2c9a0', hair: '#7a2f1d', hairStyle: 'ponytail',
+    pants: '#c2308a', glove: '#8f2368', top: '#e8447f', build: 0.9,
+    speed: 1.25, power: 0.88, hp: 92,
+    desc: 'Agile duelist',
+  },
+  {
+    id: 'sensei', name: 'Sensei',
+    color: '#d9d2c5', accent: '#8c2f22',
+    skin: '#d8a77a', hair: '#cfcabe', hairStyle: 'topknot', beard: true,
+    pants: '#b8b09c', glove: '#6b6152', top: null, build: 1.02,
+    speed: 0.98, power: 1.15, hp: 108,
+    desc: 'Old master',
+  },
 ];

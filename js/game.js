@@ -332,6 +332,17 @@ class Fighter {
       ctx.closePath(); ctx.fill();
     } else if (c.hairStyle === 'buzz') {
       ctx.beginPath(); ctx.arc(hx, hy - 2, 14.5 * s, Math.PI, Math.PI * 2); ctx.fill();
+    } else if (c.hairStyle === 'ponytail') {
+      ctx.beginPath(); ctx.arc(hx, hy - 2, 15 * s, Math.PI, Math.PI * 2); ctx.fill();
+      const sway = Math.sin(this.anim * 5) * 5;
+      ctx.strokeStyle = hair; ctx.lineWidth = 7; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(hx - d * 10 * s, hy - 10);
+      ctx.quadraticCurveTo(hx - d * 24 * s, hy + 2 + sway, hx - d * 27 * s, hy + 24 - sway);
+      ctx.stroke();
+    } else if (c.hairStyle === 'topknot') {
+      ctx.beginPath(); ctx.arc(hx, hy - 2, 14.5 * s, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(hx, hy - 19 * s, 5.5 * s, 0, 7); ctx.fill();
     } else if (!flash) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';                    // bald shine
       ctx.beginPath(); ctx.arc(hx - d * 4, hy - 8, 3.5, 0, 7); ctx.fill();
@@ -345,6 +356,14 @@ class Fighter {
     ctx.moveTo(hx - d * 12 * s, hy - 2);
     ctx.quadraticCurveTo(hx - d * 24 * s, hy + 5 + fl, hx - d * 31 * s, hy + 15 - fl);
     ctx.stroke();
+
+    // beard (old-master style)
+    if (c.beard && !flash) {
+      ctx.fillStyle = hair;
+      ctx.beginPath();
+      ctx.arc(hx + d * 1, hy + 6, 11 * s, 0.12 * Math.PI, 0.88 * Math.PI);
+      ctx.closePath(); ctx.fill();
+    }
 
     // face: angry brow, eye, mouth
     ctx.strokeStyle = F('#221a24'); ctx.lineWidth = 2.6; ctx.lineCap = 'round';
@@ -637,6 +656,12 @@ export class Game {
 
   // ---------- CPU opponent ----------
   aiInput(dt) {
+    const DIFFS = {
+      easy:   { think: 0.22, thinkR: 0.22, guard: 0.15, aggr: 0.55, jump: 0.02 },
+      normal: { think: 0.10, thinkR: 0.14, guard: 0.40, aggr: 1.00, jump: 0.05 },
+      hard:   { think: 0.06, thinkR: 0.08, guard: 0.60, aggr: 1.35, jump: 0.08 },
+    };
+    const D = DIFFS[this.cfg.difficulty] || DIFFS.normal;
     const me = this.f[1], op = this.f[0];
     const ai = this.ai;
     ai.think -= dt;
@@ -645,26 +670,26 @@ export class Game {
     const inp = { move: ai.move, jump: false, punch: false, kick: false, block: ai.blockT > 0 };
 
     if (ai.think <= 0) {
-      ai.think = 0.1 + Math.random() * 0.14;
+      ai.think = D.think + Math.random() * D.thinkR;
       const dx = op.x - me.x;
       const adx = Math.abs(dx);
       const dir = Math.sign(dx) || 1;
       ai.move = 0;
 
-      if (op.attacking && adx < 170 && Math.random() < 0.4) {
+      if (op.attacking && adx < 170 && Math.random() < D.guard) {
         ai.blockT = 0.35;
       } else if (adx > 160) {
         ai.move = dir;
-        if (Math.random() < 0.05) inp.jump = true;
+        if (Math.random() < D.jump) inp.jump = true;
       } else if (adx > 105) {
         if (Math.random() < 0.45) ai.move = dir;
-        else if (Math.random() < 0.5) inp.kick = true;
+        else if (Math.random() < 0.5 * D.aggr) inp.kick = true;
       } else {
         const r = Math.random();
-        if (r < 0.34) inp.punch = true;
-        else if (r < 0.55) inp.kick = true;
+        if (r < 0.34 * D.aggr) inp.punch = true;
+        else if (r < 0.55 * D.aggr) inp.kick = true;
         else if (r < 0.7) ai.blockT = 0.4;
-        else if (r < 0.85) ai.move = -dir;
+        else if (r < 0.9) ai.move = -dir;
       }
       inp.move = ai.move;
       inp.block = ai.blockT > 0;
@@ -768,6 +793,10 @@ export class Game {
   }
 
   drawBg(ctx) {
+    const stage = (this.round - 1) % 3;   // stage rotates every round, synced by round number
+    if (stage === 1) return this.drawBgDojo(ctx);
+    if (stage === 2) return this.drawBgBeach(ctx);
+
     const sky = ctx.createLinearGradient(0, 0, 0, FLOOR);
     sky.addColorStop(0, '#0d0d1c');
     sky.addColorStop(0.6, '#241539');
@@ -818,6 +847,131 @@ export class Game {
     ctx.fillStyle = fl;
     ctx.fillRect(0, FLOOR, W, H - FLOOR);
     ctx.strokeStyle = 'rgba(255,180,220,0.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, FLOOR); ctx.lineTo(W, FLOOR); ctx.stroke();
+  }
+
+  drawBgDojo(ctx) {
+    // warm wooden training hall
+    const wall = ctx.createLinearGradient(0, 0, 0, FLOOR);
+    wall.addColorStop(0, '#241307');
+    wall.addColorStop(0.55, '#3f2512');
+    wall.addColorStop(1, '#5a3820');
+    ctx.fillStyle = wall;
+    ctx.fillRect(0, 0, W, FLOOR);
+
+    // glowing shoji paper panels with dark frames
+    for (let i = 0; i < 6; i++) {
+      const px = 40 + i * 210, py = FLOOR - 330, pw = 150, ph = 270;
+      ctx.fillStyle = 'rgba(255,228,170,0.16)';
+      ctx.fillRect(px, py, pw, ph);
+      ctx.strokeStyle = '#1c1008'; ctx.lineWidth = 5;
+      ctx.strokeRect(px, py, pw, ph);
+      ctx.lineWidth = 2;
+      for (let gx = 1; gx < 3; gx++) {
+        ctx.beginPath(); ctx.moveTo(px + gx * pw / 3, py); ctx.lineTo(px + gx * pw / 3, py + ph); ctx.stroke();
+      }
+      for (let gy = 1; gy < 4; gy++) {
+        ctx.beginPath(); ctx.moveTo(px, py + gy * ph / 4); ctx.lineTo(px + pw, py + gy * ph / 4); ctx.stroke();
+      }
+    }
+    // beam along the top
+    ctx.fillStyle = '#1c1008';
+    ctx.fillRect(0, FLOOR - 350, W, 22);
+
+    // swaying paper lanterns
+    for (let i = 0; i < 3; i++) {
+      const lx = 220 + i * 420 + Math.sin(this.animT * 0.9 + i * 2) * 7;
+      const ly = 96;
+      ctx.strokeStyle = '#0e0804'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(220 + i * 420, 0); ctx.lineTo(lx, ly - 26); ctx.stroke();
+      const g = ctx.createRadialGradient(lx, ly, 6, lx, ly, 58);
+      g.addColorStop(0, 'rgba(255,150,90,0.5)');
+      g.addColorStop(1, 'rgba(255,150,90,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(lx, ly, 58, 0, 7); ctx.fill();
+      ctx.fillStyle = '#c43a24';
+      ctx.beginPath(); ctx.ellipse(lx, ly, 17, 24, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.5;
+      for (let r = -1; r <= 1; r++) {
+        ctx.beginPath(); ctx.ellipse(lx, ly + r * 9, 16, 5, 0, 0, 7); ctx.stroke();
+      }
+    }
+
+    // wooden plank floor
+    const fl = ctx.createLinearGradient(0, FLOOR, 0, H);
+    fl.addColorStop(0, '#6b4423');
+    fl.addColorStop(1, '#241408');
+    ctx.fillStyle = fl;
+    ctx.fillRect(0, FLOOR, W, H - FLOOR);
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1.5;
+    for (let y2 = FLOOR + 12; y2 < H; y2 += 15) {
+      ctx.beginPath(); ctx.moveTo(0, y2); ctx.lineTo(W, y2); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,200,140,0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, FLOOR); ctx.lineTo(W, FLOOR); ctx.stroke();
+  }
+
+  drawBgBeach(ctx) {
+    // sunset sky
+    const sky = ctx.createLinearGradient(0, 0, 0, FLOOR - 90);
+    sky.addColorStop(0, '#2b1a4a');
+    sky.addColorStop(0.55, '#b03a3a');
+    sky.addColorStop(1, '#ffb347');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, FLOOR - 90);
+
+    // setting sun + glow
+    const sunX = W * 0.68, sunY = FLOOR - 130;
+    const glow = ctx.createRadialGradient(sunX, sunY, 40, sunX, sunY, 190);
+    glow.addColorStop(0, 'rgba(255,214,140,0.55)');
+    glow.addColorStop(1, 'rgba(255,214,140,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(sunX, sunY, 190, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffd98c';
+    ctx.beginPath(); ctx.arc(sunX, sunY, 58, 0, 7); ctx.fill();
+
+    // thin violet clouds
+    ctx.fillStyle = 'rgba(70,32,80,0.55)';
+    ctx.fillRect(90, 110, 320, 10);
+    ctx.fillRect(620, 70, 420, 9);
+    ctx.fillRect(300, 190, 260, 8);
+
+    // sea with shimmering sun path
+    const sea = ctx.createLinearGradient(0, FLOOR - 90, 0, FLOOR);
+    sea.addColorStop(0, '#28497a');
+    sea.addColorStop(1, '#122442');
+    ctx.fillStyle = sea;
+    ctx.fillRect(0, FLOOR - 90, W, 90);
+    for (let i = 0; i < 12; i++) {
+      const sy = FLOOR - 84 + i * 7;
+      const sw2 = 26 + i * 7 + Math.sin(this.animT * 1.6 + i) * 8;
+      ctx.fillStyle = `rgba(255,208,130,${0.32 - i * 0.02})`;
+      ctx.fillRect(sunX - sw2 / 2, sy, sw2, 2.5);
+    }
+
+    // palm silhouette
+    ctx.strokeStyle = '#160e20'; ctx.lineWidth = 14; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(105, FLOOR + 8); ctx.quadraticCurveTo(120, FLOOR - 170, 170, FLOOR - 250); ctx.stroke();
+    ctx.lineWidth = 7;
+    for (let i = 0; i < 6; i++) {
+      const a = -0.5 - i * 0.42;
+      ctx.beginPath();
+      ctx.moveTo(170, FLOOR - 250);
+      ctx.quadraticCurveTo(170 + Math.cos(a) * 70, FLOOR - 250 + Math.sin(a) * 70 - 12,
+                           170 + Math.cos(a) * 125, FLOOR - 250 + Math.sin(a) * 125 + 26);
+      ctx.stroke();
+    }
+
+    // sand
+    const sand = ctx.createLinearGradient(0, FLOOR, 0, H);
+    sand.addColorStop(0, '#c8a06a');
+    sand.addColorStop(1, '#4c3820');
+    ctx.fillStyle = sand;
+    ctx.fillRect(0, FLOOR, W, H - FLOOR);
+    ctx.strokeStyle = 'rgba(255,235,190,0.5)';
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, FLOOR); ctx.lineTo(W, FLOOR); ctx.stroke();
   }
