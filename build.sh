@@ -38,6 +38,7 @@ snippet = '''<script>
         if (event.name === "SDK_READY") window.__gdReady = true;
         if (event.name === "SDK_GAME_PAUSE") document.dispatchEvent(new Event("portal-pause"));
         if (event.name === "SDK_GAME_START") document.dispatchEvent(new Event("portal-resume"));
+        if (event.name === "SDK_REWARDED_WATCH_COMPLETE") document.dispatchEvent(new Event("gd-rewarded-complete"));
       }
     };
     (function (d, s, id) {

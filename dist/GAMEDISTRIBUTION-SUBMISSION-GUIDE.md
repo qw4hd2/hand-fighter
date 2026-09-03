@@ -105,6 +105,32 @@ Click **Submit for review**. Review usually takes days to ~2 weeks. Accepted gam
 syndicated to their publisher network automatically; earnings appear under **Reports**.
 
 ---------------------------------------------------------------------------------------
+## Testing in the revision preview (the debug bar at the bottom)
+That bar is GameDistribution's SDK test harness — it only appears in the preview. Click:
+- **Interstitial** → their test interstitial plays (audio mutes, game resumes after)
+- **Rewarded** → their test rewarded ad plays
+- Then play: Quick Play a fight, lose an Arcade run (→ "CONTINUE?" rewarded popup), open
+  character select (→ Sensei "🔒 watch an ad to unlock" popup)
+- Click **"I'm done checking"** when everything works.
+
+## Rewarded ads in the game (their "Rewarded Ad Rules & Samples" PDF asks for a couple)
+1. **CONTINUE?** (their "Win Life" sample) — lose an Arcade run → "Watch a short ad to retry
+   and keep your ladder progress" / "No thanks — restart the ladder".
+2. **NEW FIGHTER** (their "New Character" sample) — Sensei is locked on portals; a rewarded ad
+   unlocks him permanently (saved on the device).
+Both are voluntary popups with a clear Watch / No thanks choice; if an ad can't be shown the
+player is never punished.
+
+## The iframe (your own website)
+GameDistribution hosts the game and serves it inside an iframe on their publishers' sites — you do
+nothing for that. Once approved you can ALSO embed it on your own site and earn from the same ads:
+```
+<iframe src="https://html5.gamedistribution.com/8e4c9b11fb6d4844aaea7547d3017ef2/"
+        width="1280" height="720" scrolling="none" frameborder="0" allow="camera; fullscreen"></iframe>
+```
+(Camera permission passes through only if the embedding page also allows it — the keyboard/touch
+fallback covers the rest.)
+
 ## What's inside the build (if their form or reviewers ask)
 - GameDistribution HTML5 SDK: `GD_OPTIONS` (your gameId + onEvent) set before the SDK loader,
   loaded from `html5.api.gamedistribution.com/main.min.js`

@@ -39,8 +39,10 @@ function showScreen(id) {
 function buildCards(container, player) {
   container.innerHTML = '';
   CHARACTERS.forEach((c, idx) => {
+    const locked = c.id === 'sensei' && player === 0 && CG.rewardedAvailable
+      && localStorage.getItem('hf-sensei') !== '1';
     const card = document.createElement('button');
-    card.className = 'char-card' + (state.chars[player] === idx ? ' selected' : '');
+    card.className = 'char-card' + (state.chars[player] === idx ? ' selected' : '') + (locked ? ' locked' : '');
     card.innerHTML = `
       <span class="avatar" style="background:${c.color}; box-shadow:0 0 18px ${c.color}66">${c.name[0]}</span>
       <span class="char-name">${c.name}</span>
@@ -49,8 +51,22 @@ function buildCards(container, player) {
         <i title="speed">⚡${'▮'.repeat(Math.round(c.speed * 3))}</i>
         <i title="power">👊${'▮'.repeat(Math.round(c.power * 3))}</i>
         <i title="health">❤${'▮'.repeat(Math.round(c.hp / 40))}</i>
-      </span>`;
+      </span>` + (locked ? '<span class="lock-tag">🔒 watch an ad to unlock</span>' : '');
     card.addEventListener('click', () => {
+      if (locked) {
+        showRewardPopup({
+          title: 'NEW FIGHTER',
+          icon: '🥋',
+          text: 'Sensei, the old master — watch a short ad to unlock him permanently.',
+          onWatch: () => CG.rewardedAd(sfx, () => {
+            localStorage.setItem('hf-sensei', '1');
+            state.chars[player] = idx;
+            buildCards(container, player);
+          }, () => {}),
+          onDecline: () => {},
+        });
+        return;
+      }
       state.chars[player] = idx;
       buildCards(container, player);
     });
@@ -301,11 +317,27 @@ function onNetLost() {
   $('online-status').textContent = 'partner disconnected';
 }
 
+function showRewardPopup({ title, icon, text, noLabel, onWatch, onDecline }) {
+  $('reward-title').textContent = title;
+  $('reward-icon').textContent = icon;
+  $('reward-text').textContent = text;
+  $('reward-no').textContent = noLabel || 'No thanks';
+  $('reward-modal').classList.remove('hidden');
+  const close = () => {
+    $('reward-modal').classList.add('hidden');
+    $('reward-watch').onclick = null;
+    $('reward-no').onclick = null;
+  };
+  $('reward-watch').onclick = () => { close(); onWatch(); };
+  $('reward-no').onclick = () => { close(); onDecline(); };
+}
+
 function showEndButtons(winnerIdx) {
   CG.gameplayStop();
   CG.happytime();
   state.matchEnded = true;
   $('end-buttons').classList.remove('hidden');
+  $('btn-rematch').textContent = 'REMATCH';
   const online = !!state.role;
   // Guests can't restart the match — the host drives it.
   $('btn-rematch').style.display = state.role === 'guest' ? 'none' : '';
@@ -332,8 +364,28 @@ function showEndButtons(winnerIdx) {
         $('btn-rematch').style.display = 'none';
         $('btn-next').classList.remove('hidden');
       }
-    } else if (state.game && state.game.banner) {
-      state.game.banner.sub = 'the run ends here — try again!';
+    } else {
+      if (state.game && state.game.banner) state.game.banner.sub = 'the run ends here — try again!';
+      if (CG.rewardedAvailable) {
+        // Rewarded "Continue?": keep ladder progress by watching an ad,
+        // otherwise the ladder restarts from the first fighter.
+        $('btn-rematch').style.display = 'none';
+        const stage = state.arcade.stage;
+        const opp = CHARACTERS[ARCADE_LADDER[stage]].name;
+        const retry = () => { stopFight(); startFight(); };
+        setTimeout(() => showRewardPopup({
+          title: 'CONTINUE?',
+          icon: '❤️',
+          text: `Watch a short ad to retry ${opp} and keep your ladder progress (${stage} of 6 beaten).`,
+          noLabel: 'No thanks — restart the ladder',
+          onWatch: () => CG.rewardedAd(sfx, retry, retry),   // ad unavailable? be generous
+          onDecline: () => {
+            state.arcade.stage = 0;
+            $('btn-rematch').textContent = 'RESTART LADDER';
+            $('btn-rematch').style.display = '';
+          },
+        }), 1400);
+      }
     }
   }
 }
@@ -357,7 +409,9 @@ function quitToMenu() {
 $('btn-quick').addEventListener('click', () => {
   sfx.unlock();
   state.mode = 'cpu';
-  state.chars[0] = (Math.random() * CHARACTERS.length) | 0;
+  const senseiLocked = CG.rewardedAvailable && localStorage.getItem('hf-sensei') !== '1';
+  const pool = senseiLocked ? CHARACTERS.length - 1 : CHARACTERS.length;
+  state.chars[0] = (Math.random() * pool) | 0;
   state.chars[1] = (state.chars[0] + 1 + ((Math.random() * (CHARACTERS.length - 1)) | 0)) % CHARACTERS.length;
   if (!localStorage.getItem('hf-diff')) state.difficulty = 'easy';   // gentle first fight
   startFight();

@@ -80,6 +80,43 @@ export const CG = {
     if (this.backend === 'crazygames') this._cg(s => s.game.hideInviteButton());
   },
 
+  get rewardedAvailable() { return !!this.backend; },
+
+  // Rewarded ad the player opted into. onReward on completion; onFail on
+  // skip / error / unavailable. Audio is muted for the duration.
+  rewardedAd(sfx, onReward, onFail) {
+    if (!this.backend) { onFail(); return; }
+    let done = false;
+    const wasMuted = sfx.muted;
+    const end = (ok) => {
+      if (done) return;
+      done = true;
+      sfx.setMuted(wasMuted);
+      (ok ? onReward : onFail)();
+    };
+    try {
+      sfx.stopMusic();
+      sfx.setMuted(true);
+      if (this.backend === 'poki') {
+        window.PokiSDK.rewardedBreak().then(ok => end(!!ok)).catch(() => end(false));
+      } else if (this.backend === 'gd') {
+        if (!(window.__gdReady && window.gdsdk && window.gdsdk.showAd)) { end(false); return; }
+        document.addEventListener('gd-rewarded-complete', () => end(true), { once: true });
+        window.gdsdk.preloadAd('rewarded')
+          .then(() => window.gdsdk.showAd('rewarded'))
+          .then(() => setTimeout(() => end(true), 50))
+          .catch(() => end(false));
+      } else {
+        window.CrazyGames.SDK.ad.requestAd('rewarded', {
+          adStarted: () => {},
+          adFinished: () => end(true),
+          adError: () => end(false),
+        });
+      }
+      setTimeout(() => end(false), 90000);   // safety net
+    } catch (e) { end(false); }
+  },
+
   // Midgame ad at a natural break. Mutes audio during the ad and ALWAYS
   // calls done() — even on error or timeout — so the game can never get stuck.
   midgameAd(sfx, done) {

@@ -290,3 +290,30 @@ body {
   display: flex; gap: 16px; align-items: center;
 }
 #end-buttons.hidden { display: none; }
+
+/* ---------- rewarded-ad popup ---------- */
+#reward-modal {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(6, 4, 14, .78);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.reward-card {
+  background: linear-gradient(#2a1d3f, #16101f);
+  border: 3px solid #ffd166; border-radius: 22px;
+  padding: 26px 30px 22px; text-align: center; max-width: 380px; width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .7);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.reward-title {
+  font-family: Impact, "Arial Black", sans-serif; font-size: 34px; letter-spacing: 2px;
+  color: #ffe27a; text-shadow: 0 3px 0 #b33c1e;
+}
+.reward-icon { font-size: 58px; line-height: 1; }
+.reward-card p { font-size: 15px; line-height: 1.5; opacity: .9; }
+.reward-card .big-btn { font-size: 24px; padding: 14px 34px; }
+
+.char-card.locked { opacity: .6; }
+.char-card .lock-tag {
+  font-size: 11px; color: #ffd166; margin-top: 4px;
+}
