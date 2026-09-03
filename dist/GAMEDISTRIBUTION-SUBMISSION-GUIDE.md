@@ -88,14 +88,14 @@ Open your game in the dashboard → **Files / Upload** → upload the final
 `hand-fighter-gamedistribution.zip` (index.html is at the zip root).
 
 ---------------------------------------------------------------------------------------
-## 4. UPLOAD THE IMAGES (all in Documents/gameHand/dist/shots/)
+## 4. UPLOAD THE IMAGES (all in Documents/gameHand/dist/shots/ — their slots accept .jpg only)
 | Slot | File |
 |---|---|
-| 512 × 512 (mandatory) | `gd-512x512.png` |
-| 512 × 384 (mandatory) | `gd-512x384.png` |
-| 200 × 120 (mandatory) | `gd-200x120.png` |
-| 1280 × 550 (optional) | `gd-1280x550.png` |
-| 1280 × 720 (optional) | `gd-1280x720.png` |
+| 512 × 512 (mandatory) | `gd-512x512.jpg` |
+| 512 × 384 (mandatory) | `gd-512x384.jpg` |
+| 200 × 120 (mandatory) | `gd-200x120.jpg` |
+| 1280 × 550 (optional) | `gd-1280x550.jpg` |
+| 1280 × 720 (optional) | `gd-1280x720.jpg` |
 | Screenshots | `shot-city.png`, `shot-dojo.png`, `shot-beach.png` |
 | Video (if asked) | `../video-landscape-1920x1080.mp4` |
 
