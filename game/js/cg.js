@@ -19,6 +19,8 @@ export const CG = {
         window.PokiSDK.gameLoadingFinished();
         this.backend = 'poki';
       } catch (e) { /* stay inactive */ }
+    } else if (window.GD_OPTIONS) {
+      this.backend = 'gd';   // GameDistribution: SDK loads async, ads via window.gdsdk
     }
   },
 
@@ -95,6 +97,9 @@ export const CG = {
       sfx.setMuted(true);
       if (this.backend === 'poki') {
         window.PokiSDK.commercialBreak(() => {}).then(finish).catch(finish);
+      } else if (this.backend === 'gd') {
+        if (window.__gdReady && window.gdsdk && window.gdsdk.showAd) window.gdsdk.showAd().then(finish).catch(finish);
+        else finish();
       } else {
         window.CrazyGames.SDK.ad.requestAd('midgame', {
           adStarted: () => {},
