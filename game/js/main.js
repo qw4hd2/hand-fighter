@@ -335,6 +335,7 @@ function showRewardPopup({ title, icon, text, noLabel, onWatch, onDecline }) {
 function showEndButtons(winnerIdx) {
   CG.gameplayStop();
   CG.happytime();
+  CG.midgameAd(sfx, () => {});   // interstitial at the natural break after a match
   state.matchEnded = true;
   $('end-buttons').classList.remove('hidden');
   $('btn-rematch').textContent = 'REMATCH';

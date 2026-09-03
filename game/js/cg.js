@@ -100,7 +100,7 @@ export const CG = {
       if (this.backend === 'poki') {
         window.PokiSDK.rewardedBreak().then(ok => end(!!ok)).catch(() => end(false));
       } else if (this.backend === 'gd') {
-        if (!(window.__gdReady && window.gdsdk && window.gdsdk.showAd)) { end(false); return; }
+        if (!(window.gdsdk && window.gdsdk.showAd)) { end(false); return; }
         document.addEventListener('gd-rewarded-complete', () => end(true), { once: true });
         window.gdsdk.preloadAd('rewarded')
           .then(() => window.gdsdk.showAd('rewarded'))
@@ -121,6 +121,9 @@ export const CG = {
   // calls done() — even on error or timeout — so the game can never get stuck.
   midgameAd(sfx, done) {
     if (!this.backend) { done(); return; }
+    // at most one interstitial per minute — keeps the pacing portal-friendly
+    if (this._lastAd && Date.now() - this._lastAd < 60000) { done(); return; }
+    this._lastAd = Date.now();
     let finished = false;
     const wasMuted = sfx.muted;
     const finish = () => {
@@ -135,7 +138,7 @@ export const CG = {
       if (this.backend === 'poki') {
         window.PokiSDK.commercialBreak(() => {}).then(finish).catch(finish);
       } else if (this.backend === 'gd') {
-        if (window.__gdReady && window.gdsdk && window.gdsdk.showAd) window.gdsdk.showAd().then(finish).catch(finish);
+        if (window.gdsdk && window.gdsdk.showAd) window.gdsdk.showAd().then(finish).catch(finish);
         else finish();
       } else {
         window.CrazyGames.SDK.ad.requestAd('midgame', {

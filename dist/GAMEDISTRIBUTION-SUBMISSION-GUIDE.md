@@ -105,13 +105,18 @@ Click **Submit for review**. Review usually takes days to ~2 weeks. Accepted gam
 syndicated to their publisher network automatically; earnings appear under **Reports**.
 
 ---------------------------------------------------------------------------------------
-## Testing in the revision preview (the debug bar at the bottom)
-That bar is GameDistribution's SDK test harness — it only appears in the preview. Click:
-- **Interstitial** → their test interstitial plays (audio mutes, game resumes after)
-- **Rewarded** → their test rewarded ad plays
-- Then play: Quick Play a fight, lose an Arcade run (→ "CONTINUE?" rewarded popup), open
-  character select (→ Sensei "🔒 watch an ad to unlock" popup)
-- Click **"I'm done checking"** when everything works.
+## Completing the two checklist steps ("Implement and test the SDK" / "Rewarded Ads")
+Their system ticks these when THE GAME ITSELF requests an ad and it is watched to the end
+(the debug-bar buttons at the bottom do NOT count — those only test the harness).
+1. Make sure the uploaded zip is the final one (no "Check correctness of your GAME ID" warning).
+2. Open the preview (the "here" link in the checklist).
+3. Interstitial check: click QUICK PLAY → play until the match ends (winning or losing) →
+   the game requests an interstitial the moment the winner screen appears → watch it fully.
+4. Rewarded check: menu → ARCADE → pick a fighter → lose the first fight (just stand there) →
+   the "CONTINUE?" popup appears → click "▶ WATCH AD" → watch it fully.
+   (Or: on the ARCADE fighter screen click the locked Sensei card → "▶ WATCH AD".)
+5. Reload the dashboard page → both circles should be ticked → "Request Activation" unlocks.
+If a circle still doesn't tick, wait a minute and reload; their detection is not instant.
 
 ## Rewarded ads in the game (their "Rewarded Ad Rules & Samples" PDF asks for a couple)
 1. **CONTINUE?** (their "Win Life" sample) — lose an Arcade run → "Watch a short ad to retry
