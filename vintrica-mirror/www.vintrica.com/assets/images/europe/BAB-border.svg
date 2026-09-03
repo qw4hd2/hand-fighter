@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [
+	<!ENTITY ns_svg "http://www.w3.org/2000/svg">
+	<!ENTITY ns_xlink "http://www.w3.org/1999/xlink">
+]>
+<svg  version="1.1" id="Layer_1" xmlns="&ns_svg;" xmlns:xlink="&ns_xlink;" width="15" height="15"
+	 viewBox="0 0 15.001 14.999" overflow="visible" xml:space="preserve">
+	<g>
+	<circle fill="#CC0000" cx="7.5" cy="7.5" r="7.5"/>
+</g>
+<circle fill="#FFFFFF" cx="7.5" cy="7.5" r="6.0"/>
+<g>
+	<ellipse cx="12.074" cy="7.5" rx="0.926" ry="1.026"/>
+	<g>
+		<rect x="2.926" y="6.474" width="9.149" height="2.052"/>
+		<ellipse cx="2.926" cy="7.5" rx="0.926" ry="1.026"/>
+	</g>
+</g>
+</svg>

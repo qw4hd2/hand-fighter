@@ -3,151 +3,98 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hand Fighter — fight with your hands via webcam</title>
-  <meta name="description" content="A free browser fighting game controlled by your hands through the webcam. Punch, kick and block with gestures — vs CPU, 2 players on one camera, or online with a friend. Works with keyboard and touch too.">
-  <meta property="og:title" content="Hand Fighter 🥊">
-  <meta property="og:description" content="Fight with your hands — no controller, just your camera. Play vs CPU or challenge a friend online.">
+  <title>Hand Fighter — Free Webcam Fighting Game (Play in Browser)</title>
+  <meta name="description" content="Hand Fighter is a free browser fighting game you control with your hands through the webcam. Punch, kick and block with real gestures. Play vs CPU, 2 players on one camera, or online with friends. Works on phone and laptop.">
+  <meta property="og:title" content="Hand Fighter — fight with your hands via webcam">
+  <meta property="og:description" content="Free browser fighting game controlled by hand gestures. Play now — no download.">
   <meta property="og:type" content="website">
+  <meta property="og:image" content="assets/site/cover-1920x1080.png">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥊</text></svg>">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="site.css">
+
+  <!-- ===== GOOGLE ADSENSE =====
+       Once your AdSense account is approved, paste the script Google gives you
+       here (it looks like the line below with your own ca-pub ID) and remove
+       the comment markers. -->
+  <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script> -->
 </head>
 <body>
 
-  <!-- ============ MAIN MENU ============ -->
-  <section id="menu-screen" class="screen active">
-    <h1 class="logo">HAND<span>FIGHTER</span></h1>
-    <p class="tagline">Fight with your hands — no controller, just your camera</p>
+<header class="top">
+  <a class="brand" href="./">🥊 Hand Fighter</a>
+  <nav>
+    <a href="#how">How to play</a>
+    <a href="#modes">Modes</a>
+    <a href="#faq">FAQ</a>
+    <a class="nav-play" href="game/">Play</a>
+  </nav>
+</header>
 
-    <canvas id="menu-demo" width="880" height="265"></canvas>
-    <div id="gesture-demo">
-      <span>✋ MOVE</span><span>☝️ JUMP</span><span>✊ PUNCH</span><span>✌️ KICK</span><span>🤟 BLOCK</span>
-    </div>
+<section class="hero">
+  <h1>HAND <span>FIGHTER</span></h1>
+  <p class="tagline">The fighting game you control with your bare hands — through your webcam.<br>No controller. No download. Just show your hand.</p>
+  <a class="play-btn" href="game/">▶ PLAY NOW — FREE</a>
+  <p class="hero-note">Works on phone &amp; laptop · camera optional · keyboard and touch supported</p>
+  <div class="hero-video">
+    <video src="assets/site/preview.mp4" poster="assets/site/cover-1920x1080.png"
+           autoplay muted loop playsinline preload="metadata"></video>
+  </div>
+</section>
 
-    <div class="menu-buttons">
-      <button id="btn-quick" class="big-btn">⚡ QUICK PLAY <small>instant fight</small></button>
-      <button id="btn-arcade" class="big-btn">ARCADE <small>beat all 6 fighters</small></button>
-      <button id="btn-1p" class="big-btn">1 PLAYER <small>vs CPU</small></button>
-      <button id="btn-2p" class="big-btn">2 PLAYERS <small>same camera</small></button>
-      <button id="btn-online" class="big-btn">ONLINE MATCH <small>play over the internet</small></button>
-    </div>
+<div class="ad-slot"><!-- AdSense ad unit (in-article) goes here after approval --></div>
 
-    <div class="help-box">
-      <h3>Hand controls</h3>
-      <div class="help-grid">
-        <div><span class="g">✋</span> Open palm — lean left / right to <b>move</b></div>
-        <div><span class="g">☝️✋</span> Raise hand high to <b>jump</b></div>
-        <div><span class="g">✊</span> Fist — <b>punch</b></div>
-        <div><span class="g">✌️</span> Two fingers — <b>kick</b></div>
-        <div><span class="g">🤟</span> Three fingers — <b>block</b></div>
-      </div>
-      <h3>Keyboard backup</h3>
-      <div class="help-grid small">
-        <div><b>P1:</b> A / D move · W jump · S block · F punch · G kick</div>
-        <div><b>P2:</b> ← / → move · ↑ jump · ↓ block · K punch · L kick</div>
-      </div>
-    </div>
-    <p id="privacy-note">🔒 Your camera is processed entirely on your device — no video is ever uploaded, stored, or shared.</p>
-  </section>
+<section id="how" class="block">
+  <h2>How to play</h2>
+  <p>Stand in front of your camera, give yourself a little room, and use these gestures:</p>
+  <div class="gestures">
+    <div><span>✋</span><b>Open palm</b>lean left / right to move</div>
+    <div><span>☝️</span><b>Raise hand</b>lift high to jump</div>
+    <div><span>✊</span><b>Fist</b>punch</div>
+    <div><span>✌️</span><b>Two fingers</b>kick</div>
+    <div><span>🤟</span><b>Three fingers</b>block</div>
+  </div>
+  <p class="muted">No camera? Use the keyboard (A/D move · W jump · S block · F punch · G kick) or the on-screen touch buttons on your phone.</p>
+</section>
 
-  <!-- ============ CHARACTER SELECT ============ -->
-  <section id="setup-screen" class="screen">
-    <h2 class="screen-title">CHOOSE YOUR FIGHTER</h2>
-    <div id="setup-panels">
-      <div class="setup-panel" id="panel-p1">
-        <h3>Player 1</h3>
-        <input id="name-p1" type="text" maxlength="14" placeholder="Enter your name" value="Player 1">
-        <div class="char-cards" id="cards-p1"></div>
-      </div>
-      <div class="setup-panel" id="panel-p2">
-        <h3 id="panel-p2-title">Player 2</h3>
-        <div id="arcade-info" class="hidden">
-          🏆 Fight all <b>six fighters</b> one after another.<br>
-          Difficulty rises with every victory.<br>
-          Lose once and the run is over!
-        </div>
-        <div id="difficulty-row" class="hidden">
-          <button class="diff-btn" data-d="easy">EASY</button>
-          <button class="diff-btn" data-d="normal">NORMAL</button>
-          <button class="diff-btn" data-d="hard">HARD</button>
-        </div>
-        <input id="name-p2" type="text" maxlength="14" placeholder="Enter your name" value="Player 2">
-        <div class="char-cards" id="cards-p2"></div>
-      </div>
-    </div>
-    <div class="setup-actions">
-      <button id="btn-back" class="small-btn">← Back</button>
-      <button id="btn-fight" class="big-btn fight-btn">FIGHT!</button>
-      <label class="opt-label"><input type="checkbox" id="opt-hands" checked> 🖐 hand tracking (webcam)</label>
-    </div>
-  </section>
+<section id="modes" class="block alt">
+  <h2>Three ways to fight</h2>
+  <div class="cards">
+    <article><h3>🏆 Arcade</h3><p>Climb the ladder: beat all six fighters in a row as the difficulty rises. Lose once and the run is over.</p></article>
+    <article><h3>🎮 1 Player</h3><p>Quick fights against the CPU on Easy, Normal or Hard. One click from the menu straight into the ring.</p></article>
+    <article><h3>🌍 Online</h3><p>Create a room, send the 4-letter code to a friend anywhere in the world, and fight live — each on your own camera.</p></article>
+  </div>
+</section>
 
-  <!-- ============ ONLINE LOBBY ============ -->
-  <section id="online-screen" class="screen">
-    <h2 class="screen-title">ONLINE MATCH</h2>
-    <div class="setup-panel online-panel">
-      <h3>You</h3>
-      <input id="name-online" type="text" maxlength="14" placeholder="Enter your name" value="Player">
-      <div class="char-cards" id="cards-online"></div>
-    </div>
-    <div id="online-actions">
-      <button id="btn-create" class="big-btn">CREATE ROOM</button>
-      <span class="or">— or —</span>
-      <div class="join-row">
-        <input id="join-code" type="text" maxlength="4" placeholder="CODE" autocomplete="off">
-        <button id="btn-join" class="big-btn">JOIN</button>
-      </div>
-    </div>
-    <div id="room-code-box" class="hidden">
-      Room code: <b id="room-code"></b>
-      <span>send this to your partner — they click JOIN and type it in</span>
-      <span>⚠ keep this tab open and on screen until they join — switching apps puts the room to sleep</span>
-      <button id="btn-invite" class="small-btn hidden">🔗 Copy invite link</button>
-    </div>
-    <div id="online-status"></div>
-    <button id="btn-online-back" class="small-btn">← Back</button>
-  </section>
+<section class="block">
+  <h2>Six fighters, three stages</h2>
+  <div class="shots">
+    <img src="assets/site/shot-city.png" alt="Hand Fighter — combo in the neon night city stage" loading="lazy">
+    <img src="assets/site/shot-dojo.png" alt="Hand Fighter — high kick in the lantern-lit dojo" loading="lazy">
+    <img src="assets/site/shot-beach.png" alt="Hand Fighter — fight on the sunset beach" loading="lazy">
+  </div>
+  <p>Blaze, Frost, Volt, Onyx, Kira and Sensei — each with their own speed, power and health. Chain hits into combos, break your rival's guard, and knock them out across a neon city, a lantern-lit dojo and a sunset beach.</p>
+</section>
 
-  <!-- ============ GAME ============ -->
-  <section id="game-screen" class="screen">
-    <div id="game-wrap">
-      <canvas id="game-canvas" width="1280" height="620"></canvas>
+<div class="ad-slot"><!-- AdSense ad unit goes here after approval --></div>
 
-      <div id="cam-panel" title="tap to shrink / hide the camera preview">
-        <video id="cam-video" playsinline muted autoplay></video>
-        <canvas id="cam-canvas" width="320" height="180"></canvas>
-        <div id="cam-status">camera: starting…</div>
-      </div>
+<section id="faq" class="block alt">
+  <h2>Frequently asked questions</h2>
+  <details open><summary>Is Hand Fighter really free?</summary><p>Yes. It runs in your browser with nothing to install. The site is supported by ads.</p></details>
+  <details><summary>Does it work on my phone?</summary><p>Yes — it works in Chrome or Safari on Android and iPhone. Hold your phone sideways for the best view. If hand tracking runs slow on an older phone, the on-screen touch buttons work great.</p></details>
+  <details><summary>Is my camera video uploaded anywhere?</summary><p>No. Hand tracking runs entirely on your own device. No video is ever sent, stored or shared. You can also turn hand tracking off and play with keyboard or touch.</p></details>
+  <details><summary>How does online play work?</summary><p>One player clicks Create Room and gets a 4-letter code. The other types the code and joins. The match runs live between your two browsers — each of you can use your own camera or keyboard.</p></details>
+  <details><summary>Which gestures are the most reliable?</summary><p>Keep your hand inside the camera view with your palm facing the camera, in decent light. A clear fist and a clear open palm are the two gestures you'll use most.</p></details>
+</section>
 
-      <div id="touch-controls" class="hidden">
-        <div class="tc tc-left">
-          <button class="tc-btn" data-k="left">◀</button>
-          <button class="tc-btn" data-k="right">▶</button>
-          <button class="tc-btn tc-up" data-k="jump">▲</button>
-        </div>
-        <div class="tc tc-right">
-          <button class="tc-btn tc-block" data-k="block">🛡</button>
-          <button class="tc-btn tc-punch" data-k="punch">👊</button>
-          <button class="tc-btn tc-kick" data-k="kick">🦶</button>
-        </div>
-      </div>
+<section class="cta">
+  <h2>Ready to fight?</h2>
+  <a class="play-btn" href="game/">▶ PLAY HAND FIGHTER</a>
+</section>
 
-      <div id="rotate-hint">🔄 rotate your phone sideways for the best view</div>
+<footer>
+  <p>© 2026 Hand Fighter · <a href="about.html">About</a> · <a href="privacy.html">Privacy Policy</a> · <a href="contact.html">Contact</a></p>
+  <p class="muted">Your camera is processed entirely on your device — no video is ever uploaded, stored or shared.</p>
+</footer>
 
-      <div id="end-buttons" class="hidden">
-        <button id="btn-next" class="big-btn hidden">NEXT OPPONENT ▶</button>
-        <button id="btn-rematch" class="big-btn">REMATCH</button>
-        <button id="btn-share" class="small-btn">🔗 Copy game link</button>
-        <button id="btn-newfighters" class="small-btn">Change fighters</button>
-        <button id="btn-menu2" class="small-btn">Main menu</button>
-      </div>
-
-      <button id="btn-mute" title="Sound on/off">🔊</button>
-      <button id="btn-quit" title="Quit to menu">✕</button>
-    </div>
-  </section>
-
-  <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script type="module" src="js/main.js"></script>
 </body>
 </html>

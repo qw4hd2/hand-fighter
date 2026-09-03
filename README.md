@@ -28,11 +28,15 @@ Developer checks: `python hand_fighter.py --selftest` (headless engine test), `p
 
 ## 🌐 Web version
 
+The repo root is the marketing website (`index.html`, `about.html`, `privacy.html`, `contact.html`); the game itself lives in **`game/`**.
+
 ```bash
 python3 -m http.server 8123
 ```
 
-Then open <http://localhost:8123> and allow camera access. Needs internet on first load (MediaPipe comes from a CDN).
+Then open <http://localhost:8123> (site) or <http://localhost:8123/game/> (game directly) and allow camera access. Needs internet on first load (MediaPipe comes from a CDN).
+
+Portal builds: `./build.sh` produces `dist/hand-fighter-web.zip` (itch.io / CrazyGames) and `dist/hand-fighter-poki.zip`.
 
 ## How to play
 

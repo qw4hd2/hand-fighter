@@ -9,7 +9,9 @@ export const CG = {
     if (window.CrazyGames && window.CrazyGames.SDK) {
       try {
         await window.CrazyGames.SDK.init();
-        if (window.CrazyGames.SDK.environment === 'crazygames') this.backend = 'crazygames';
+        // Active everywhere except explicitly disabled domains, so CrazyGames'
+        // QA/preview environments detect the SDK calls too.
+        if (window.CrazyGames.SDK.environment !== 'disabled') this.backend = 'crazygames';
       } catch (e) { /* stay inactive */ }
     } else if (window.PokiSDK) {
       try {

@@ -1,0 +1,89 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: Verdana, Geneva, sans-serif;
+  background: radial-gradient(ellipse at 50% 0%, #241539 0%, #0d0d1c 60%);
+  color: #f0eefc;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+}
+a { color: #ffd166; }
+.muted { opacity: .65; font-size: 14px; }
+
+.top {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 20px; flex-wrap: wrap; gap: 10px;
+  background: rgba(0, 0, 0, .35);
+}
+.brand { font-weight: bold; font-size: 18px; color: #fff; text-decoration: none; }
+nav { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+nav a { color: #cfcbe0; text-decoration: none; font-size: 14px; }
+.nav-play {
+  background: #ff5533; color: #fff !important; padding: 8px 16px; border-radius: 8px; font-weight: bold;
+}
+
+.hero { text-align: center; padding: 48px 18px 30px; }
+.hero h1 {
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: clamp(48px, 11vw, 96px); letter-spacing: 3px;
+  color: #ffe27a; text-shadow: 0 4px 0 #b33c1e, 0 8px 24px rgba(255, 100, 40, .45);
+}
+.hero h1 span { color: #ff5533; }
+.tagline { font-size: clamp(15px, 2.6vw, 19px); opacity: .85; margin: 14px auto 26px; max-width: 640px; }
+.play-btn {
+  display: inline-block; text-decoration: none;
+  font-family: Impact, "Arial Black", sans-serif; font-size: clamp(22px, 5vw, 30px); letter-spacing: 2px;
+  color: #fff; background: linear-gradient(#ff7a3c, #d63c1e);
+  border: 3px solid #ffd166; border-radius: 16px; padding: 16px 40px;
+  box-shadow: 0 6px 0 #7a1f0e, 0 12px 30px rgba(255, 120, 60, .35);
+  transition: transform .1s;
+}
+.play-btn:hover { transform: translateY(-2px); }
+.play-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #7a1f0e; }
+.hero-note { margin-top: 14px; font-size: 13px; opacity: .6; }
+.hero-video { max-width: 860px; margin: 30px auto 0; border-radius: 16px; overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, .15); box-shadow: 0 16px 50px rgba(0, 0, 0, .55); }
+.hero-video video { width: 100%; display: block; }
+
+.ad-slot { max-width: 860px; margin: 26px auto; min-height: 0; text-align: center; }
+
+.block { max-width: 900px; margin: 0 auto; padding: 44px 20px; }
+.block.alt { background: rgba(0, 0, 0, .28); max-width: none; }
+.block.alt > * { max-width: 900px; margin-left: auto; margin-right: auto; }
+.block h2 { font-family: Impact, "Arial Black", sans-serif; font-size: clamp(28px, 5vw, 40px);
+  letter-spacing: 2px; color: #ffe27a; margin-bottom: 14px; }
+.block p { margin-bottom: 12px; }
+
+.gestures { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 18px 0; }
+.gestures div {
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 14px; padding: 16px 12px; text-align: center; font-size: 14px;
+}
+.gestures span { display: block; font-size: 38px; margin-bottom: 6px; }
+.gestures b { display: block; color: #ffd166; margin-bottom: 2px; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 18px; }
+.cards article {
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 14px; padding: 20px;
+}
+.cards h3 { margin-bottom: 8px; font-size: 20px; }
+
+.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 18px 0; }
+.shots img { width: 100%; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .15); }
+
+details { background: rgba(255, 255, 255, .05); border-radius: 12px; padding: 12px 16px; margin-bottom: 10px; }
+summary { cursor: pointer; font-weight: bold; color: #ffd166; }
+details p { margin-top: 8px; font-size: 15px; }
+
+.cta { text-align: center; padding: 50px 20px; }
+.cta h2 { font-family: Impact, "Arial Black", sans-serif; font-size: 36px; color: #ffe27a; margin-bottom: 18px; letter-spacing: 2px; }
+
+footer { text-align: center; padding: 30px 20px 40px; font-size: 14px; opacity: .8; }
+footer p { margin-bottom: 8px; }
+
+.page { max-width: 760px; margin: 0 auto; padding: 40px 20px 60px; }
+.page h1 { font-family: Impact, "Arial Black", sans-serif; letter-spacing: 2px; color: #ffe27a; margin-bottom: 18px; font-size: 40px; }
+.page h2 { color: #ffd166; margin: 26px 0 8px; font-size: 20px; }
+.page p, .page li { margin-bottom: 10px; }
+.page ul { padding-left: 22px; }
