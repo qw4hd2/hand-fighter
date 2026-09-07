@@ -55,3 +55,30 @@ PY
 (cd dist/gd-build && zip -qr ../hand-fighter-gamedistribution.zip .)
 rm -rf dist/gd-build
 ls -la dist/hand-fighter-gamedistribution.zip
+
+# ---------------- Doodle Wheels (wheels/) ----------------
+rm -f dist/doodle-wheels-web.zip dist/doodle-wheels-crazygames.zip dist/doodle-wheels-poki.zip dist/doodle-wheels-gamedistribution.zip
+(cd wheels && zip -qr ../dist/doodle-wheels-web.zip index.html style.css js lib -x '*.DS_Store')
+cp dist/doodle-wheels-web.zip dist/doodle-wheels-crazygames.zip
+rm -rf dist/dw-poki && mkdir -p dist/dw-poki && cp -r wheels/. dist/dw-poki/
+sed -i '' 's|<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>|<script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>|' dist/dw-poki/index.html
+(cd dist/dw-poki && zip -qr ../doodle-wheels-poki.zip .) && rm -rf dist/dw-poki
+DW_ID="${DW_GAME_ID:-PUT-YOUR-GAMEDISTRIBUTION-GAME-ID-HERE}"
+rm -rf dist/dw-gd && mkdir -p dist/dw-gd && cp -r wheels/. dist/dw-gd/
+python3 - "$DW_ID" <<'PY'
+import sys
+gid = sys.argv[1]; p = 'dist/dw-gd/index.html'; s = open(p).read()
+snippet = '''<script>
+    window["GD_OPTIONS"] = { "gameId": "%s", "onEvent": function (event) {
+        if (event.name === "SDK_READY") window.__gdReady = true;
+        if (event.name === "SDK_REWARDED_WATCH_COMPLETE") document.dispatchEvent(new Event("gd-rewarded-complete"));
+    } };
+    (function (d, s, id) { var js, fjs = d.getElementsByTagName(s)[0]; if (d.getElementById(id)) return;
+      js = d.createElement(s); js.id = id; js.src = "https://html5.api.gamedistribution.com/main.min.js";
+      fjs.parentNode.insertBefore(js, fjs); }(document, "script", "gamedistribution-jssdk"));
+  </script>''' % gid
+s = s.replace('<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>', snippet)
+open(p, 'w').write(s)
+PY
+(cd dist/dw-gd && zip -qr ../doodle-wheels-gamedistribution.zip .) && rm -rf dist/dw-gd
+ls -la dist/doodle-wheels-*.zip

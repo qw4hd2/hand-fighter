@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Doodle Wheels — draw your wheels, beat the track</title>
+  <meta name="description" content="Draw your own wheels and race across hills, stairs, spikes, mud and water. Every obstacle needs a different wheel shape. Free browser game for phone and desktop.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛞</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="1280" height="720"></canvas>
+
+  <div id="hud">
+    <div id="hud-level">LEVEL 1</div>
+    <div id="hud-bar"><div id="hud-fill"></div><span id="hud-flag">🏁</span></div>
+    <div id="hud-time">0.0s</div>
+  </div>
+  <div id="hint" class="hidden">Stuck? Draw a different wheel! ✏️</div>
+
+  <div id="presets">
+    <button data-p="circle" title="Round">⚪</button>
+    <button data-p="square" title="Square">⬛</button>
+    <button data-p="star" title="Star">⭐</button>
+    <button data-p="paddle" title="Paddle">✚</button>
+  </div>
+  <div id="pad">
+    <canvas id="padcv" width="220" height="220"></canvas>
+    <div id="pad-label">✏️ draw a wheel</div>
+  </div>
+
+  <button id="btn-mute" title="Sound">🔊</button>
+
+  <div id="menu" class="overlay">
+    <h1>DOODLE<span>WHEELS</span></h1>
+    <p class="tag">Draw your own wheels. Every obstacle needs a different shape.</p>
+    <div class="how">
+      <div>⚪ hills → round</div><div>⬛ stairs → square</div>
+      <div>⭐ mud → spiky</div><div>✚ water → paddles</div>
+    </div>
+    <button id="btn-play" class="big">▶ PLAY</button>
+    <p class="small">Draw in the pad (bottom-left) any time — even while driving. Tap the left / right side of the screen to lean.</p>
+  </div>
+
+  <div id="win" class="overlay hidden">
+    <h2>LEVEL CLEAR!</h2>
+    <div id="stars">★★★</div>
+    <p id="win-time"></p>
+    <button id="btn-next" class="big">NEXT LEVEL ▶</button>
+  </div>
+
+  <div id="fail" class="overlay hidden">
+    <h2 id="fail-title">CRASHED!</h2>
+    <p id="fail-text">Back to the last checkpoint…</p>
+    <button id="btn-retry" class="big">↻ RETRY</button>
+    <button id="btn-skip" class="small-btn hidden">▶ Watch an ad to skip this level</button>
+  </div>
+</div>
+
+<script src="lib/decomp.min.js"></script>
+<script src="lib/matter.min.js"></script>
+<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
