@@ -17,7 +17,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // preset wheel shapes (points relative to the hub)
 const PRESETS = {
   circle: () => Array.from({ length: 22 }, (_, i) => ({ x: Math.cos(i / 22 * Math.PI * 2) * 26, y: Math.sin(i / 22 * Math.PI * 2) * 26 })),
-  square: () => [{ x: -26, y: -26 }, { x: 26, y: -26 }, { x: 26, y: 26 }, { x: -26, y: 26 }],
+  square: () => [{ x: -30, y: -30 }, { x: 30, y: -30 }, { x: 30, y: 30 }, { x: -30, y: 30 }],
   star: () => Array.from({ length: 12 }, (_, i) => { const r = i % 2 ? 17 : 36, a = i / 12 * Math.PI * 2; return { x: Math.cos(a) * r, y: Math.sin(a) * r }; }),
   paddle: () => { const p = []; const n = 4, w = 9, L = 38; for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); p.push({ x: c * 10 - s * w, y: s * 10 + c * w }, { x: c * L - s * w, y: s * L + c * w }, { x: c * L + s * w, y: s * L - c * w }, { x: c * 10 + s * w, y: s * 10 - c * w }); } return p; },
 };
@@ -42,16 +42,16 @@ function buildLevel(n) {
       case 'flat': x += f.len; add(x, y); break;
       case 'hills': { const segs = Math.round(f.len / 40), amp = 40 + r() * 45; for (let i = 1; i <= segs; i++) { x += 40; add(x, y - Math.sin(i / segs * Math.PI * 2) * amp); } add(x, y); break; }
       case 'bumps': { const segs = Math.round(f.len / 34); for (let i = 1; i <= segs; i++) { x += 34; add(x, y - (i % 2) * 24); } add(x, y); break; }
-      case 'stairs': { const steps = 3 + Math.floor(r() * 3), sh = 36 + r() * 8, sw = 72;
+      case 'stairs': { const steps = 3 + Math.floor(r() * 3), sh = 31 + r() * 7, sw = 72;
         for (let i = 0; i < steps; i++) { x += sw; add(x, y); y -= sh; add(x, y); }
         x += 140; add(x, y);
         for (let i = 0; i < steps; i++) { x += 48; add(x, y); y += sh; add(x, y); }
         x += 40; add(x, y); break; }
       case 'spikes': { const x0 = x; x += f.len; for (let sx = x0 + 50; sx < x - 50; sx += 40) spikes.push({ x: sx, y }); add(x, y); break; }
       case 'mud': { zones.push({ type: 'mud', x0: x, x1: x + f.len, y }); x += f.len; add(x, y); break; }
-      case 'water': { const x0 = x; add(x, y); x += 30; y += 95; add(x, y);
+      case 'water': { const x0 = x; add(x, y); x += 50; y += 95; add(x, y);
         zones.push({ type: 'water', x0, x1: x0 + f.len, surface: y - 95 + 8 });
-        x += f.len - 60; add(x, y); x += 30; y -= 95; add(x, y); break; }
+        x += f.len - 190; add(x, y); x += 70; y -= 55; add(x, y); x += 70; y -= 40; add(x, y); break; }
     }
   }
   x += 260; add(x, y);
@@ -70,7 +70,7 @@ const G = {
 };
 
 function buildWorld(levelNo) {
-  G.engine = Engine.create({ gravity: { x: 0, y: 1 } });
+  G.engine = Engine.create({ gravity: { x: 0, y: 1 }, positionIterations: 10, velocityIterations: 8, constraintIterations: 4 });
   G.level = buildLevel(levelNo);
   const world = G.engine.world;
   const { pts, spikes, zones } = G.level;
@@ -83,6 +83,7 @@ function buildWorld(levelNo) {
       isStatic: true, angle: Math.atan2(dy, dx), friction: 1, label: 'ground',
     });
     World.add(world, seg);
+    World.add(world, Bodies.circle(b.x, b.y + 9, 11, { isStatic: true, friction: 1, label: 'ground' }));
   }
   // solid floor far below (catch-all)
   World.add(world, Bodies.rectangle(pts[pts.length - 1].x / 2, 1400, pts[pts.length - 1].x + 2000, 200, { isStatic: true, label: 'abyss' }));
@@ -91,19 +92,21 @@ function buildWorld(levelNo) {
     World.add(world, Bodies.fromVertices(s.x, s.y - 16, [[{ x: -16, y: 18 }, { x: 0, y: -16 }, { x: 16, y: 18 }]], { isStatic: true, friction: 0.2, label: 'spike' }));
   }
   G.zones = zones;
-  spawnCar(pts[1].x + 120, pts[1].y - 70);
+  spawnCar(pts[1].x + 120, pts[1].y - 34);
   G.time = 0; G.checkpoint = pts[1].x + 120; G.lastProgress = 0; G.stuckT = 0; G.flipT = 0;
 }
 
 function makeWheel(x, y, shape) {
   let b = null;
-  try { b = Bodies.fromVertices(x, y, [shape], { friction: 1.2, frictionStatic: 1.5, density: 0.004, restitution: 0.02, label: 'wheel' }, true); } catch (e) { b = null; }
-  if (!b) b = Bodies.circle(x, y, 26, { friction: 1.2, density: 0.004, label: 'wheel' });
+  try { b = Bodies.fromVertices(x, y, [shape], { friction: 1.2, frictionStatic: 1.5, density: 0.004, restitution: 0.02, label: 'wheel', collisionFilter: { group: G.carGroup } }, true); } catch (e) { b = null; }
+  if (!b) b = Bodies.circle(x, y, 26, { friction: 1.2, density: 0.004, label: 'wheel', collisionFilter: { group: G.carGroup } });
   b.shape = shape;
   b.radius = Math.max(...shape.map(p => Math.hypot(p.x, p.y)));
   b.grip = wheelGrip(shape);
   return b;
 }
+
+function wheelRadius(shape) { return Math.max(...shape.map(p => Math.hypot(p.x, p.y))); }
 
 // how "spiky" a shape is: perimeter relative to its enclosing circle (1 = round)
 function wheelGrip(shape) {
@@ -118,9 +121,11 @@ function wheelGrip(shape) {
 function spawnCar(x, y) {
   const world = G.engine.world;
   if (G.car) { Composite.remove(world, [G.car, ...G.wheels, ...G.axles]); }
-  G.car = Bodies.rectangle(x, y, 112, 26, { density: 0.0032, friction: 0.6, chamfer: { radius: 8 }, label: 'car' });
-  G.wheels = [makeWheel(x - 38, y + 22, G.shape), makeWheel(x + 38, y + 22, G.shape)];
-  G.axles = G.wheels.map((w, i) => Constraint.create({ bodyA: G.car, pointA: { x: i ? 38 : -38, y: 18 }, bodyB: w, pointB: { x: 0, y: 0 }, stiffness: 1, length: 0 }));
+  G.carGroup = G.carGroup || Body.nextGroup(true);   // car + wheels never collide with each other
+  G.car = Bodies.rectangle(x, y, 112, 26, { density: 0.0032, friction: 0.6, chamfer: { radius: 8 }, label: 'car', collisionFilter: { group: G.carGroup } });
+  G.spawnT = 0;
+  G.wheels = [makeWheel(x - 50, y + 8, G.shape), makeWheel(x + 50, y + 8, G.shape)];
+  G.axles = G.wheels.map((w, i) => Constraint.create({ bodyA: G.car, pointA: { x: i ? 50 : -50, y: 6 }, bodyB: w, pointB: { x: 0, y: 0 }, stiffness: 1, length: 0 }));
   World.add(world, [G.car, ...G.wheels, ...G.axles]);
 }
 
@@ -133,7 +138,7 @@ function setShape(shape) {
     Body.setVelocity(nw, w.velocity);
     Body.setAngularVelocity(nw, w.angularVelocity);
     Composite.remove(world, [w, G.axles[i]]);
-    G.axles[i] = Constraint.create({ bodyA: G.car, pointA: { x: i ? 38 : -38, y: 18 }, bodyB: nw, pointB: { x: 0, y: 0 }, stiffness: 1, length: 0 });
+    G.axles[i] = Constraint.create({ bodyA: G.car, pointA: { x: i ? 50 : -50, y: 6 }, bodyB: nw, pointB: { x: 0, y: 0 }, stiffness: 1, length: 0 });
     G.wheels[i] = nw;
     World.add(world, [nw, G.axles[i]]);
   });
@@ -150,10 +155,16 @@ function step(dt) {
   if (G.state !== 'play') return;
   const ts = G.drawing ? 0.15 : 1;
   const car = G.car;
+  G.spawnT = (G.spawnT || 0) + dt * ts;
+  const pitchNow = Math.atan2(Math.sin(car.angle), Math.cos(car.angle));
+  let throttle = clamp(G.spawnT / 0.8, 0.2, 1);               // soft start after (re)spawn
+  const afloat = G.wheels.some(w => inZone(w, 'water'));
+  if (!afloat && pitchNow < -0.35) throttle *= clamp(1 + (pitchNow + 0.35) * 2.2, 0.15, 1);   // anti-wheelie (nose up = negative)
 
   for (const w of G.wheels) {
-    const target = 0.34;
-    Body.setAngularVelocity(w, w.angularVelocity + (target - w.angularVelocity) * 0.10 * ts);
+    const target = 0.30 * throttle * clamp(26 / w.radius, 0.7, 1);    // clockwise spin = rolls forward
+    const dv = clamp(target - w.angularVelocity, -0.02, 0.02) * ts;   // torque-limited motor (no instant rim speed)
+    Body.setAngularVelocity(w, w.angularVelocity + dv);
     const mud = inZone(w, 'mud');
     if (mud && w.position.y > mud.y - w.radius - 6) {
       const slip = clamp(1 - (w.grip - 1.05) * 2.2, 0.05, 1);   // round ≈1, star/paddle ≈0
@@ -165,9 +176,10 @@ function step(dt) {
     if (water) {
       const depth = clamp((w.position.y - water.surface) / 50, 0, 1.6);
       if (depth > 0) {
-        const paddle = Math.max(0, w.grip - 1.18);               // round = 0, paddle/star > 0
-        Body.applyForce(w, w.position, { x: w.angularVelocity * w.radius * paddle * 0.00012 * w.mass, y: -w.mass * 0.0016 * depth });
-        Body.setVelocity(w, { x: w.velocity.x * 0.90, y: w.velocity.y * 0.96 });
+        const paddle = clamp((w.grip - 1.05) * 4, 0, 1);          // round/square = 0, paddle ≈ 0.7, star = 1
+        Body.applyForce(w, w.position, { x: w.angularVelocity * w.radius * paddle * 0.00045 * w.mass, y: -w.mass * 0.0016 * depth });
+        Body.applyForce(car, car.position, { x: w.angularVelocity * w.radius * paddle * 0.00035 * car.mass, y: 0 });   // paddles push the whole boat
+        Body.setVelocity(w, { x: w.velocity.x * 0.94, y: w.velocity.y * 0.96 });
       }
     }
   }
@@ -176,13 +188,28 @@ function step(dt) {
     const depth = clamp((car.position.y - waterC.surface) / 40, 0, 1.6);
     if (depth > 0) {
       Body.applyForce(car, car.position, { x: 0, y: -car.mass * 0.0014 * depth });
-      Body.setVelocity(car, { x: car.velocity.x * 0.90, y: car.velocity.y });
+      Body.setVelocity(car, { x: car.velocity.x * 0.95, y: car.velocity.y });
     }
   }
-  if (G.lean) Body.setAngularVelocity(car, car.angularVelocity + G.lean * 0.0035);
+  const wrapped = Math.atan2(Math.sin(car.angle), Math.cos(car.angle));
+  let torque = G.lean * 0.9 * car.mass;                                             // player lean
+  if (!G.lean && Math.abs(wrapped) > 1.6 && Math.abs(wrapped) < 2.9) torque -= Math.sign(wrapped) * 0.3 * car.mass;  // rescue when upside-down
+  car.torque += torque * ts;
 
   Engine.update(G.engine, dt * 1000 * ts);
   G.time += dt * ts;
+
+  // arcade safety caps (Matter can inject energy through rigid pins on bumpy ground)
+  const capV = (b, maxX, maxY) => {
+    const v = b.velocity;
+    const nx = clamp(v.x, -maxX, maxX), ny = clamp(v.y, -maxY, maxY);
+    if (nx !== v.x || ny !== v.y) Body.setVelocity(b, { x: nx, y: ny });
+  };
+  capV(car, 9, 12); for (const w of G.wheels) capV(w, 10, 13);
+  if (Math.abs(car.angularVelocity) > 0.12) Body.setAngularVelocity(car, Math.sign(car.angularVelocity) * 0.12);
+  // gentle self-righting when airborne / tilting (keeps the arcade feel, no flips from bumps)
+  const grounded = G.wheels.some(w => w.velocity.y > -0.5 && w.velocity.y < 0.5);
+  if (!G.lean && !grounded && Math.abs(wrapped) < 1.6) Body.setAngularVelocity(car, car.angularVelocity - wrapped * 0.03);
 
   G.camX += ((car.position.x - 420) - G.camX) * 0.12;
   G.camY += ((car.position.y - 430) - G.camY) * 0.08;
@@ -191,7 +218,7 @@ function step(dt) {
   if (prog - G.checkpoint > 700) G.checkpoint = prog;
   if (prog > G.lastProgress + 6) { G.lastProgress = prog; G.stuckT = 0; } else G.stuckT += dt;
   $('hint').classList.toggle('hidden', G.stuckT < 4);
-  const ang = Math.abs(((car.angle + Math.PI) % (2 * Math.PI)) - Math.PI);
+  const ang = Math.abs(Math.atan2(Math.sin(car.angle), Math.cos(car.angle)));
   G.flipT = ang > 2.4 ? G.flipT + dt : 0;
   if (G.flipT > 2.2) return fail('FLIPPED!', 'Lean with the left / right side of the screen…');
   if (car.position.y > 1200) return fail('FELL!', 'Wider or bigger wheels bridge the gaps.');
