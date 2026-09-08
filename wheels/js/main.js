@@ -555,4 +555,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__dw = { G, step, startLevel, setShape, PRESETS, respawn };
+window.__dw = { G, step, startLevel, setShape, PRESETS, respawn, draw };
