@@ -72,6 +72,29 @@ class SFX {
     src.start(t0);
   }
 
+  // continuous engine hum; rate 0..1 follows wheel speed
+  engine(rate) {
+    if (!this.ctx || this.muted) { this.engineStop(); return; }
+    const c = this.ctx, t = c.currentTime;
+    try {
+      if (!this.eng) {
+        const o = c.createOscillator(), o2 = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain();
+        o.type = 'sawtooth'; o2.type = 'square'; f.type = 'lowpass'; f.frequency.value = 300; g.gain.value = 0.0001;
+        o.connect(f); o2.connect(f); f.connect(g).connect(c.destination); o.start(); o2.start();
+        this.eng = { o, o2, f, g };
+      }
+      const e = this.eng;
+      e.o.frequency.setTargetAtTime(42 + rate * 120, t, 0.08);
+      e.o2.frequency.setTargetAtTime(21 + rate * 60, t, 0.08);
+      e.f.frequency.setTargetAtTime(220 + rate * 700, t, 0.1);
+      e.g.gain.setTargetAtTime(0.035 + rate * 0.05, t, 0.1);
+    } catch (err) { /* ignore */ }
+  }
+
+  engineStop() {
+    if (this.eng && this.ctx) { try { this.eng.g.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 0.08); } catch (err) { /* ignore */ } }
+  }
+
   play(name) {
     if (!this.ctx || this.muted) return;
     try {
