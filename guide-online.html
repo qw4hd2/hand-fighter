@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Online Play Guide — Rooms, Codes and Connection Fixes | Hand Fighter</title>
+  <meta name="description" content="How online matches work in Hand Fighter: creating a room, sharing the 4-letter code or invite link, what the host does, and how to fix 'stuck on connecting'.">
+  <link rel="stylesheet" href="site.css">
+  <!-- ===== GOOGLE ADSENSE ===== paste the AdSense script here after approval -->
+  <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script> -->
+</head>
+<body>
+<header class="top"><a class="brand" href="./">🥊 Hand Fighter</a><nav><a href="./#guides">Guides</a><a class="nav-play" href="game/">Play</a></nav></header>
+<main class="page">
+  <h1>Online play: rooms, codes and fixing connection problems</h1>
+  <p>Hand Fighter's online mode connects two browsers directly to each other. There is no account, no lobby to wait in and no server that runs the match: one player creates a room, the other joins it with a four-letter code, and the fight starts. This guide explains what happens behind the scenes and what to do when a connection refuses to go through.</p>
+
+  <h2>Starting a match</h2>
+  <ol>
+    <li>Player one opens the game, chooses <b>Online</b>, then <b>Create Room</b>. A code such as <b>R4TV</b> appears after a second or two. Wait until you actually see the code before sharing it.</li>
+    <li>Share the code, or tap <b>Share invite</b> to send a link that already contains it. The link opens the game with the code filled in.</li>
+    <li>Player two chooses <b>Online</b>, then <b>Join</b>, types the code and confirms. Both screens switch to the fighter select, and the match begins when both players are ready.</li>
+  </ol>
+  <p>Room codes expire when the creator leaves the screen. If your friend says the code is invalid, create a fresh room and send the new code; don't reuse an old one.</p>
+
+  <h2>Who runs the match</h2>
+  <p>The room creator's browser is the host: it runs the physics and decides hits and knockouts. The joining player's browser sends inputs and shows the result. This keeps both players perfectly in sync, but it also means the host's connection matters most. If the host is on a weak mobile signal, both players feel it, so let the person with the better internet create the room.</p>
+
+  <h2>Fixing "stuck on connecting"</h2>
+  <ul>
+    <li><b>Check both players see the same code.</b> The letters O and 0, and I and 1, look alike. Use the invite link to avoid typos.</li>
+    <li><b>Refresh and try again.</b> Most failed connections succeed on the second attempt, because the first one is used to discover a working path between the two networks.</li>
+    <li><b>Turn off VPNs and "private relay" features.</b> These hide the network address the connection needs. Apple's iCloud Private Relay and browser VPN extensions are the usual culprits.</li>
+    <li><b>Try mobile data instead of office or school Wi-Fi.</b> Some networks block direct connections entirely. The game falls back to a relay server in that case, but very strict networks block even that.</li>
+    <li><b>Don't join your own room.</b> Opening the join screen in a second tab with your own code closes the room. Use two different devices.</li>
+    <li><b>Give it ten seconds.</b> Connecting across countries can take a moment while the relay path is negotiated.</li>
+  </ul>
+
+  <h2>Controls during an online match</h2>
+  <p>Both players use their own camera, keyboard or touch buttons; the joining player uses the player-one keys (<b>A/D</b>, <b>W</b>, <b>S</b>, <b>F</b>, <b>G</b>) even though they appear on the right side of the screen. Hand tracking works the same as offline, and your camera video is never sent to the other player; only your inputs travel over the connection.</p>
+
+  <h2>Lag and fairness</h2>
+  <p>Inputs take a few dozen milliseconds to reach the host, so the joining player's moves are shown a fraction of a second later than they were made. On a normal home connection this is not noticeable; on a bad connection punches feel delayed. If one player consistently feels slow, swap roles so that player creates the room, or wait for a better connection. Matches are best of three rounds, and a disconnect ends the match with no winner rather than awarding it to the player who stayed.</p>
+
+  <p><a class="play-btn" href="game/">▶ Play Hand Fighter online</a></p>
+</main>
+<div class="ad-slot"><!-- AdSense ad unit goes here after approval --></div>
+<footer><p><a href="./">Home</a> · <a href="./#guides">Guides</a> · <a href="about.html">About</a> · <a href="privacy.html">Privacy Policy</a> · <a href="contact.html">Contact</a></p></footer>
+</body>
+</html>

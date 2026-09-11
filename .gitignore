@@ -3,3 +3,6 @@ venv/
 __pycache__/
 *.pyc
 .DS_Store
+
+# unrelated local website mirror (contains cookies.txt) — never publish
+vintrica-mirror/

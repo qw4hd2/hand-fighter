@@ -87,3 +87,11 @@ footer p { margin-bottom: 8px; }
 .page h2 { color: #ffd166; margin: 26px 0 8px; font-size: 20px; }
 .page p, .page li { margin-bottom: 10px; }
 .page ul { padding-left: 22px; }
+
+/* guide pages */
+.page ol { padding-left: 22px; }
+.page table { width: 100%; border-collapse: collapse; margin: 14px 0 18px; font-size: 15px; }
+.page th, .page td { text-align: left; padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,0.12); vertical-align: top; }
+.page th { color: #ffd166; font-weight: 700; }
+.page h3 { color: #fff; margin: 18px 0 6px; font-size: 17px; }
+.page .play-btn { display: inline-block; margin-top: 10px; }
