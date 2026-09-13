@@ -55,7 +55,7 @@ nav a { color: #cfcbe0; text-decoration: none; font-size: 14px; }
 .block p { margin-bottom: 12px; }
 
 .gestures { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 18px 0; }
-.gestures div {
+.gestures > div {
   background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12);
   border-radius: 14px; padding: 16px 12px; text-align: center; font-size: 14px;
 }
@@ -135,7 +135,7 @@ footer p { margin-bottom: 8px; }
 .game-card.soon .thumb { display: flex; align-items: center; justify-content: center; font-size: 56px; background: rgba(255,255,255,.04); }
 
 .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 18px; }
-.features div { background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); border-radius: 14px; padding: 20px; }
+.features > div { background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); border-radius: 14px; padding: 20px; }
 .features span { font-size: 34px; display: block; margin-bottom: 8px; }
 .features b { display: block; color: #ffd166; margin-bottom: 4px; font-size: 17px; }
 .features p { font-size: 14px; opacity: .85; margin: 0; }
@@ -148,8 +148,8 @@ footer p { margin-bottom: 8px; }
   border: 2px solid rgba(255, 255, 255, .15); box-shadow: 0 16px 50px rgba(0, 0, 0, .55); }
 .hero-shot img { width: 100%; display: block; }
 .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 18px; counter-reset: step; }
-.steps div { background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); border-radius: 14px; padding: 20px; }
-.steps div::before { counter-increment: step; content: counter(step); display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center;
+.steps > div { background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); border-radius: 14px; padding: 20px; }
+.steps > div::before { counter-increment: step; content: counter(step); display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center;
   border-radius: 50%; background: #ff5533; color: #fff; font-weight: bold; margin-bottom: 10px; }
 .steps b { display: block; color: #ffd166; margin-bottom: 4px; }
 .steps p { font-size: 14px; opacity: .85; margin: 0; }
@@ -170,3 +170,12 @@ footer p { margin-bottom: 8px; }
 .hero-logo { margin: 0 auto 6px; max-width: 700px; }
 .hero-logo img { width: 100%; height: auto; display: block; filter: drop-shadow(0 10px 30px rgba(255, 120, 60, .25)); }
 .motto { font-family: Impact, "Arial Black", sans-serif; letter-spacing: 4px; text-transform: uppercase; font-size: clamp(14px, 2.4vw, 18px); color: #ffd166; opacity: .9; }
+
+/* vector icons */
+.ico-box { width: 48px; height: 48px; border-radius: 13px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;
+  background: linear-gradient(135deg, #ff8a4c, #d63c1e); box-shadow: 0 6px 16px rgba(255, 90, 50, .28); }
+.ico-box.c2 { background: linear-gradient(135deg, #48d2ff, #1a7fd4); box-shadow: 0 6px 16px rgba(40, 160, 255, .28); }
+.ico-box svg { width: 24px; height: 24px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ico-inline { width: 22px; height: 22px; stroke: #ffd166; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; margin-right: 4px; }
+.ico-stat { width: 26px; height: 26px; stroke: #ffd166; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+.ico-big { width: 64px; height: 64px; stroke: rgba(255, 209, 102, .7); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
