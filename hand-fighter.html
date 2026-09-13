@@ -17,6 +17,9 @@
   <link rel="apple-touch-icon" href="assets/site/apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
   <meta name="theme-color" content="#1a1230">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="site.css">
   <!-- ===== GOOGLE ADSENSE ===== paste the AdSense script here after approval -->
   <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script> -->
@@ -56,7 +59,7 @@
   <div class="badges"><span class="badge">Fighting</span><span class="badge">Webcam control</span><span class="badge">2 players</span><span class="badge">Online</span></div>
   <h1>HAND <span>FIGHTER</span></h1>
   <p class="tagline">The fighting game you control with your bare hands — through your webcam.<br>No controller. No download. Just show your hand.</p>
-  <a class="play-btn" href="game/">▶ PLAY NOW — FREE</a>
+  <div class="hero-actions"><a class="play-btn" href="game/">▶ Play now — free</a><a class="play-btn ghost" href="#how">How to play</a></div>
   <p class="hero-note">Works on phone &amp; laptop · camera optional · keyboard and touch supported</p>
   <div class="hero-video">
     <video src="assets/site/preview.mp4" poster="assets/site/cover-1920x1080.png"
@@ -67,6 +70,7 @@
 <div class="ad-slot"><!-- AdSense ad unit (in-article) goes here after approval --></div>
 
 <section id="how" class="block">
+  <span class="label">Controls</span>
   <h2>How to play</h2>
   <p>Stand in front of your camera, give yourself a little room, and use these gestures:</p>
   <div class="gestures">
@@ -80,6 +84,7 @@
 </section>
 
 <section id="modes" class="block alt">
+  <span class="label">Modes</span>
   <h2>Three ways to fight</h2>
   <div class="cards">
     <article><h3><svg class="ico-inline"><use href="#i-trophy"/></svg> Arcade</h3><p>Climb the ladder: beat all six fighters in a row as the difficulty rises. Lose once and the run is over.</p></article>
@@ -89,6 +94,7 @@
 </section>
 
 <section class="block">
+  <span class="label">Roster</span>
   <h2>Six fighters, three stages</h2>
   <div class="shots">
     <img src="assets/site/shot-city.png" alt="Hand Fighter — combo in the neon night city stage" loading="lazy">
@@ -101,6 +107,7 @@
 <div class="ad-slot"><!-- AdSense ad unit goes here after approval --></div>
 
 <section id="faq" class="block alt">
+  <span class="label">FAQ</span>
   <h2>Frequently asked questions</h2>
   <details open><summary>Is Hand Fighter really free?</summary><p>Yes. It runs in your browser with nothing to install. The site is supported by ads.</p></details>
   <details><summary>Does it work on my phone?</summary><p>Yes — it works in Chrome or Safari on Android and iPhone. Hold your phone sideways for the best view. If hand tracking runs slow on an older phone, the on-screen touch buttons work great.</p></details>
@@ -110,9 +117,13 @@
 </section>
 
 <section class="cta">
+ <div class="cta-panel">
   <h2>Ready to fight?</h2>
+  <div class="hero-actions">
   <a class="play-btn" href="game/">▶ PLAY HAND FIGHTER</a>
   <p class="hero-note">Also try <a href="doodle-wheels.html">Doodle Wheels</a>, our draw-your-own-wheels racer.</p>
+  </div>
+ </div>
 </section>
 
 <footer class="foot">

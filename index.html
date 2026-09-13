@@ -17,6 +17,9 @@
   <link rel="apple-touch-icon" href="assets/site/apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
   <meta name="theme-color" content="#1a1230">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="site.css">
 
   <!-- ===== GOOGLE ADSENSE =====
@@ -55,10 +58,12 @@
 </header>
 
 <section class="hero portal">
-  <h1 class="hero-logo"><picture><source srcset="assets/site/logo-full.webp" type="image/webp"><img src="assets/site/logo-full.png" alt="Zada Games" width="700"></picture></h1>
+  <span class="eyebrow"><b>New</b> Doodle Wheels online races for 2–6 players <span class="dot"></span></span>
+  <h1 class="hero-logo"><picture><source srcset="assets/site/logo-full.webp" type="image/webp"><img src="assets/site/logo-full.png" alt="Zada Games" width="640"></picture></h1>
   <p class="motto">Unleash the experience</p>
-  <p class="tagline">Free browser games you can start in seconds. No download, no account, no waiting. Open one on your phone or laptop and play.</p>
-  <a class="play-btn" href="#games">▶ PICK A GAME</a>
+  <p class="hero-h">Games that start <span class="grad-text">in seconds.</span><br>No download. No account.</p>
+  <p class="tagline">Free browser games built for your phone and laptop. Open one and you're playing, alone or with friends across the world.</p>
+  <div class="hero-actions"><a class="play-btn" href="#games">Pick a game</a><a class="play-btn ghost" href="doodle-wheels.html">Race friends →</a></div>
   <div class="stats">
     <div><b>2</b>games and counting</div>
     <div><b>100%</b>free to play</div>
@@ -70,6 +75,7 @@
 <div class="ad-slot"><!-- AdSense ad unit goes here after approval --></div>
 
 <section id="games" class="block">
+  <span class="label">Play now</span>
   <h2>Our games</h2>
   <p>Every game here runs straight in your browser. Tap <b>Play</b> to start right away, or open the details page to see how it works first.</p>
   <div class="game-grid">
@@ -113,9 +119,10 @@
 </section>
 
 <section class="block alt">
-  <h2>Why people play here</h2>
+  <span class="label">Why Zada</span>
+  <h2>Made to be played, not installed</h2>
   <div class="features">
-    <div><div class="ico-box"><svg><use href="#i-zap"/></svg></div><b>Instant</b><p>One tap from this page to gameplay. Nothing to install, nothing to sign up for.</p></div>
+    <div class="wide"><div class="ico-box"><svg><use href="#i-zap"/></svg></div><b>Instant</b><p>One tap from this page to gameplay. Nothing to install, nothing to sign up for.</p></div>
     <div><div class="ico-box c2"><svg><use href="#i-phone"/></svg></div><b>Made for phones</b><p>Touch controls, landscape layouts and light downloads, so games load fast on mobile data.</p></div>
     <div><div class="ico-box"><svg><use href="#i-lock"/></svg></div><b>Camera stays private</b><p>Hand Fighter's hand tracking runs on your own device. No video is ever uploaded or stored.</p></div>
     <div><div class="ico-box c2"><svg><use href="#i-globe"/></svg></div><b>Play with friends</b><p>Share a 4-letter room code and fight someone in another city, straight from the browser.</p></div>
@@ -125,6 +132,7 @@
 <div class="ad-slot"><!-- AdSense ad unit goes here after approval --></div>
 
 <section id="guides" class="block">
+  <span class="label">Learn</span>
   <h2>Guides</h2>
   <p>Short, practical guides written by the people who made the games.</p>
   <div class="cards">
@@ -135,10 +143,13 @@
 </section>
 
 <section class="cta">
+ <div class="cta-panel">
   <h2>Ready to play?</h2>
+  <div class="hero-actions">
   <a class="play-btn" href="game/">▶ HAND FIGHTER</a>
-  &nbsp;
-  <a class="play-btn" href="wheels/">▶ DOODLE WHEELS</a>
+<a class="play-btn" href="wheels/">▶ DOODLE WHEELS</a>
+  </div>
+ </div>
 </section>
 
 <footer class="foot">
