@@ -73,6 +73,8 @@
       <ul id="race-players"></ul>
       <div id="race-host-controls">
         <div id="race-len" class="row"><span class="small">Track:</span><button data-lvl="2">Short</button><button data-lvl="4" class="on">Medium</button><button data-lvl="6">Long</button></div>
+        <div id="race-rounds" class="row"><span class="small">Rounds:</span><button data-r="1">1</button><button data-r="3" class="on">3</button><button data-r="5">5</button><button data-r="0">One per player</button></div>
+        <p id="race-rounds-note" class="small"></p>
         <button id="btn-race-start" class="big" disabled>Waiting for players…</button>
       </div>
       <p id="race-guest-note" class="small hidden">The host starts the race when everyone is in.</p>
@@ -83,7 +85,9 @@
 
   <div id="race-res" class="overlay hidden">
     <h2 id="race-res-title">RESULTS</h2>
+    <p id="race-res-round" class="small hidden"></p>
     <ol id="race-res-list"></ol>
+    <div id="race-table-wrap" class="hidden"><h3 id="race-table-title">Standings</h3><ol id="race-table"></ol></div>
     <button id="btn-race-again" class="big">↻ RACE AGAIN</button>
     <p id="race-res-wait" class="small">Waiting for the host to start the next race…</p>
     <button id="btn-race-res-leave" class="small-btn">Leave</button>

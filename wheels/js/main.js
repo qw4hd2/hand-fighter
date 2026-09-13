@@ -508,7 +508,10 @@ const R = {
   on: false, role: null, net: null, code: null, myId: null, name: '', phase: 'idle',
   players: new Map(),            // id -> { id, name, color, x, y, a, tx, ty, ta, spin, shape, prog, fin, place }
   seed: 0, lvl: 4, countdownEnd: 0, lastSend: 0, finishOrder: [], firstFinishAt: 0, results: null, inviteUrl: null, hudT: 0,
+  rounds: 3, round: 0, points: new Map(),      // championship: rounds per series, current round (1-based), id -> points
 };
+const ROUND_POINTS = [10, 7, 5, 3, 2, 1];
+function roundsTotal() { return R.rounds === 0 ? Math.max(1, R.players.size) : R.rounds; }
 const rid = (id) => id;
 function myColor() { const me = R.players.get(R.myId); return me ? me.color : '#e6452c'; }
 function raceStatus(msg) { $('race-status').textContent = msg || ''; }
@@ -605,7 +608,7 @@ function mkPlayer(id, name, colorIdx) {
 }
 
 function lobbyList() { return [...R.players.values()].map(p => ({ id: p.id, name: p.name, color: p.color })); }
-function hostBroadcastLobby() { if (R.role === 'host' && R.net) R.net.broadcast({ t: 'lobby', players: lobbyList(), lvl: R.lvl }); }
+function hostBroadcastLobby() { if (R.role === 'host' && R.net) R.net.broadcast({ t: 'lobby', players: lobbyList(), lvl: R.lvl, rounds: R.rounds }); }
 
 function renderLobby() {
   const list = $('race-players'); list.innerHTML = '';
@@ -620,6 +623,8 @@ function renderLobby() {
   $('btn-race-start').disabled = !(host && R.players.size >= 2);
   $('btn-race-start').textContent = R.players.size >= 2 ? '🏁 START RACE' : 'Waiting for players…';
   document.querySelectorAll('#race-len button').forEach(b => b.classList.toggle('on', +b.dataset.lvl === R.lvl));
+  document.querySelectorAll('#race-rounds button').forEach(b => b.classList.toggle('on', +b.dataset.r === R.rounds));
+  $('race-rounds-note').textContent = roundsTotal() === 1 ? 'Single race' : `${roundsTotal()} rounds · points 10-7-5-3-2-1 · podium at the end`;
   $('race-count').textContent = `${R.players.size} / ${RACE_MAX} players`;
 }
 
@@ -643,10 +648,10 @@ function handleRaceData(from, d) {
       if (host) return;
       const next = new Map();
       for (const p of d.players) { const old = R.players.get(p.id); next.set(p.id, old ? Object.assign(old, { name: p.name, color: p.color }) : Object.assign(mkPlayer(p.id, p.name, 0), { color: p.color })); }
-      R.players = next; R.lvl = d.lvl || R.lvl; renderLobby();
+      R.players = next; R.lvl = d.lvl || R.lvl; if (d.rounds !== undefined) R.rounds = d.rounds; renderLobby();
       break;
     }
-    case 'start': if (!host) raceStart(d.seed, d.lvl); break;
+    case 'start': if (!host) { R.round = d.round || 1; R.roundsNow = d.rounds || 1; if (R.round === 1) R.points.clear(); raceStart(d.seed, d.lvl); } break;
     case 's': {                                          // guest -> host position
       if (!host) return;
       const p = R.players.get(from); if (p) { p.tx = d.x; p.ty = d.y; p.ta = d.a; p.prog = d.p; }
@@ -674,15 +679,17 @@ function handleRaceData(from, d) {
       if (d.id === R.myId) showFinishedBanner(d.place);
       break;
     }
-    case 'res': if (!host) showResults(d.list); break;
+    case 'res': if (!host) showResults(d.list, d.table || [], d.round || 1, d.rounds || 1, !!d.final); break;
     case 'bye': raceAbort('The host closed the room.'); break;
   }
 }
 
 function raceStartHost() {
   if (R.role !== 'host' || R.players.size < 2) return;
+  if (R.round === 0 || R.round >= R.roundsNow) { R.round = 0; R.points.clear(); R.roundsNow = roundsTotal(); }   // new series
+  R.round += 1;
   const seed = (Math.random() * 1e9) | 0;
-  R.net.broadcast({ t: 'start', seed, lvl: R.lvl });
+  R.net.broadcast({ t: 'start', seed, lvl: R.lvl, round: R.round, rounds: R.roundsNow });
   raceStart(seed, R.lvl);
 }
 
@@ -693,7 +700,7 @@ function raceStart(seed, lvl) {
   $('race-banner').classList.add('hidden');
   $('race-hud').classList.remove('hidden');
   G.levelNo = lvl;
-  $('hud-level').textContent = 'RACE';
+  $('hud-level').textContent = (R.roundsNow || 1) > 1 ? `ROUND ${R.round}/${R.roundsNow}` : 'RACE';
   setShape(PRESETS.circle());
   buildWorld(lvl, seed);
   G.camX = G.car.position.x - 420; G.camY = G.car.position.y - 430;
@@ -749,28 +756,57 @@ function hostMaybeFinish() {
   if (!done && !timeout) return;
   const list = all.sort((a, b) => (a.fin === null) - (b.fin === null) || (a.place || 99) - (b.place || 99) || b.prog - a.prog)
     .map((p, i) => ({ id: p.id, name: p.name, color: p.color, time: p.fin, place: p.fin !== null ? p.place : null, prog: Math.round(p.prog * 100) }));
-  R.net.broadcast({ t: 'res', list });
-  showResults(list);
+  for (const p of list) if (p.place) R.points.set(p.id, (R.points.get(p.id) || 0) + (ROUND_POINTS[p.place - 1] || 0));
+  const table = [...R.players.values()].map(p => ({ id: p.id, name: p.name, color: p.color, pts: R.points.get(p.id) || 0 })).sort((a, b) => b.pts - a.pts);
+  const final = R.round >= R.roundsNow;
+  const msg = { t: 'res', list, table, round: R.round, rounds: R.roundsNow, final };
+  R.net.broadcast(msg);
+  showResults(list, table, R.round, R.roundsNow, final);
 }
 
-function showResults(list) {
+function showResults(list, table, round, rounds, final) {
   R.phase = 'results'; G.state = 'results';
   $('race-banner').classList.add('hidden');
   CG.gameplayStop();
-  const ol = $('race-res-list'); ol.innerHTML = '';
   const medals = ['🥇', '🥈', '🥉'];
-  list.forEach((p, i) => {
+  const ol = $('race-res-list'); ol.innerHTML = '';
+  list.forEach((p) => {
     const li = document.createElement('li');
     li.innerHTML = `<span class="pl">${p.place ? medals[p.place - 1] || p.place + '.' : '—'}</span><i style="background:${p.color}"></i><span class="nm">${p.name}${p.id === R.myId ? ' (you)' : ''}</span><span class="tm">${p.time !== null ? p.time.toFixed(2) + 's' : 'DNF · ' + p.prog + '%'}</span>`;
     ol.appendChild(li);
   });
   const me = list.find(p => p.id === R.myId);
-  $('race-res-title').textContent = me && me.place === 1 ? 'YOU WIN!' : me && me.place ? ordinal(me.place).toUpperCase() + ' PLACE' : 'RACE OVER';
+  const series = rounds > 1;
+  $('race-res-round').textContent = series ? `Round ${round} of ${rounds}` : '';
+  $('race-res-round').classList.toggle('hidden', !series);
+  // championship table
+  const tb = $('race-table'); tb.innerHTML = '';
+  $('race-table-wrap').classList.toggle('hidden', !series);
+  if (series) {
+    table.forEach((p, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="pl">${final ? (medals[i] || i + 1 + '.') : i + 1 + '.'}</span><i style="background:${p.color}"></i><span class="nm">${p.name}${p.id === R.myId ? ' (you)' : ''}</span><span class="tm">${p.pts} pts</span>`;
+      tb.appendChild(li);
+    });
+  }
+  if (final && series) {
+    const champ = table[0], meRank = table.findIndex(p => p.id === R.myId) + 1;
+    $('race-res-title').textContent = champ && champ.id === R.myId ? 'YOU ARE THE CHAMPION!' : meRank ? `CHAMPIONSHIP: ${ordinal(meRank).toUpperCase()}` : 'CHAMPIONSHIP OVER';
+    $('race-table-title').textContent = '🏆 Final standings';
+    $('btn-race-again').textContent = '🏆 NEW CHAMPIONSHIP';
+    $('race-res-wait').textContent = 'Waiting for the host to start a new championship…';
+    sfx.play('win');
+  } else {
+    $('race-res-title').textContent = me && me.place === 1 ? 'YOU WIN!' : me && me.place ? ordinal(me.place).toUpperCase() + ' PLACE' : 'RACE OVER';
+    $('race-table-title').textContent = 'Standings';
+    $('btn-race-again').textContent = series ? `NEXT ROUND (${round + 1}/${rounds}) ▶` : '↻ RACE AGAIN';
+    $('race-res-wait').textContent = series ? 'Waiting for the host to start the next round…' : 'Waiting for the host to start the next race…';
+  }
   $('btn-race-again').classList.toggle('hidden', R.role !== 'host');
   $('race-res-wait').classList.toggle('hidden', R.role === 'host');
   $('race-res').classList.remove('hidden');
   $('race-hud').classList.add('hidden');
-  if (R.role === 'host') CG.midgameAd(sfx, () => {});
+  if (R.role === 'host' && (final || !series)) CG.midgameAd(sfx, () => {});
 }
 
 function raceAgain() {
@@ -787,7 +823,7 @@ function raceAbort(msg) {
 
 function raceLeave(silent) {
   if (R.net) { if (R.role === 'host') R.net.broadcast({ t: 'bye' }); R.net.close(); R.net = null; }
-  R.on = false; R.phase = 'idle'; R.role = null; R.myId = null; R.players.clear();
+  R.on = false; R.phase = 'idle'; R.role = null; R.myId = null; R.players.clear(); R.round = 0; R.points.clear();
   ['race', 'race-res', 'race-hud', 'race-banner'].forEach(id => $(id).classList.add('hidden'));
   CG.gameplayStop();
   if (!silent) { G.state = 'menu'; $('menu').classList.remove('hidden'); }
@@ -919,6 +955,7 @@ $('btn-race-copy').addEventListener('click', async () => {
   catch (e) { raceStatus('Link: ' + url); }
 });
 document.querySelectorAll('#race-len button').forEach(b => b.addEventListener('click', () => { if (R.role !== 'host') return; R.lvl = +b.dataset.lvl; hostBroadcastLobby(); renderLobby(); }));
+document.querySelectorAll('#race-rounds button').forEach(b => b.addEventListener('click', () => { if (R.role !== 'host') return; R.rounds = +b.dataset.r; hostBroadcastLobby(); renderLobby(); }));
 $('btn-next').addEventListener('click', () => CG.midgameAd(sfx, () => startLevel(G.levelNo + 1)));
 $('btn-retry').addEventListener('click', () => CG.midgameAd(sfx, respawn));
 $('btn-skip').addEventListener('click', () => CG.rewardedAd(sfx, () => startLevel(G.levelNo + 1), () => {}));
