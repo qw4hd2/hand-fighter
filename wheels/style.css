@@ -44,3 +44,31 @@ html, body { height: 100%; background: #0e1424; color: #fff; font-family: Verdan
 .big:active { transform: translateY(3px); box-shadow: 0 2px 0 #7a1f0e; }
 .small-btn { font-size: 15px; color: #fff; background: rgba(255,255,255,.1); border: 2px solid rgba(255,255,255,.35);
   border-radius: 10px; padding: 10px 20px; cursor: pointer; }
+
+/* race mode */
+.big.race { background: linear-gradient(#3fb4ff, #1a6fd0); border-color: #bfe6ff; box-shadow: 0 6px 0 #0e3f7a; font-size: clamp(18px, 3vw, 24px); padding: 12px 30px; }
+.big.race:active { box-shadow: 0 2px 0 #0e3f7a; }
+.big:disabled { opacity: .45; cursor: default; transform: none; }
+#race .row, #race-res .row { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+#race .field { display: flex; flex-direction: column; gap: 4px; font-size: 14px; opacity: .9; }
+#race input { font: inherit; font-size: 20px; padding: 10px 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.35); color: #fff; text-align: center; width: 200px; }
+#race-code { width: 120px; text-transform: uppercase; letter-spacing: 4px; font-family: Impact, "Arial Black", sans-serif; }
+#race .or { opacity: .6; }
+#race .code { font-size: 18px; opacity: .85; }
+#race .code b { font-family: Impact, "Arial Black", sans-serif; font-size: clamp(34px, 6vw, 56px); letter-spacing: 8px; color: #ffe27a; margin-left: 8px; }
+#race-players { list-style: none; display: flex; gap: 8px 16px; flex-wrap: wrap; justify-content: center; font-size: 15px; }
+#race-players li, #race-res-list li, #race-hud div { display: flex; align-items: center; gap: 8px; }
+#race-players i, #race-res-list i, #race-hud i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 2px solid rgba(255,255,255,.7); }
+#race-len button { font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 10px; border: 2px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); color: #fff; cursor: pointer; }
+#race-len button.on { background: #ffe27a; color: #222; border-color: #ffe27a; font-weight: bold; }
+#race-hud { position: absolute; top: 44px; left: 12px; background: rgba(0,0,0,.45); border-radius: 12px; padding: 8px 12px; font-size: 14px; pointer-events: none; min-width: 150px; }
+#race-hud div { padding: 2px 0; }
+#race-hud div.me { color: #ffe27a; font-weight: bold; }
+#race-hud b { margin-left: auto; font-weight: bold; }
+#race-banner { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.6); color: #7ef0b0;
+  font-family: Impact, "Arial Black", sans-serif; letter-spacing: 1px; font-size: clamp(18px, 3vw, 28px); padding: 10px 22px; border-radius: 14px; pointer-events: none; }
+#race-res-list { list-style: none; display: flex; flex-direction: column; gap: 8px; min-width: min(90vw, 380px); font-size: 17px; }
+#race-res-list li { background: rgba(255,255,255,.08); border-radius: 10px; padding: 8px 12px; }
+#race-res-list .pl { width: 34px; text-align: center; font-size: 20px; }
+#race-res-list .nm { flex: 1; text-align: left; }
+#race-res-list .tm { font-family: Impact, "Arial Black", sans-serif; letter-spacing: 1px; color: #ffe27a; }

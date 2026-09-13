@@ -1,6 +1,7 @@
 // Doodle Wheels — draw your own wheels and beat physics-based tracks.
 import { CG } from './cg.js';
 import { sfx } from './sfx.js';
+import { RaceRoom, genCode } from './race-net.js';
 
 const { Engine, World, Bodies, Body, Composite, Constraint, Common, Vertices } = Matter;
 if (window.decomp) Common.setDecomp(window.decomp);
@@ -23,8 +24,8 @@ const PRESETS = {
 };
 
 // ------------------------------------------------------------ level generation
-function buildLevel(n) {
-  const r = rng(1000 + n * 7919);
+function buildLevel(n, seed) {
+  const r = rng(seed !== undefined ? seed : 1000 + n * 7919);
   const pool = ['hills', 'stairs', 'bumps', 'mud', 'spikes', 'water'];
   const avail = pool.slice(0, Math.min(pool.length, 2 + n));
   const feats = [{ type: 'flat', len: 520 }];
@@ -70,9 +71,9 @@ const G = {
   best: +(localStorage.getItem('dw-level') || 1),
 };
 
-function buildWorld(levelNo) {
+function buildWorld(levelNo, seed) {
   G.engine = Engine.create({ gravity: { x: 0, y: 1 }, positionIterations: 10, velocityIterations: 8, constraintIterations: 4 });
-  G.level = buildLevel(levelNo);
+  G.level = buildLevel(levelNo, seed);
   const world = G.engine.world;
   const { pts, spikes, zones } = G.level;
 
@@ -148,6 +149,7 @@ function setShape(shape) {
   });
   drawPadShape();
   sfx.play('whoosh');
+  if (R.on) raceSendShape();
 }
 
 // ------------------------------------------------------------ simulation
@@ -156,6 +158,7 @@ function inZone(body, type) {
 }
 
 function step(dt) {
+  if (G.state === 'countdown') { if (performance.now() >= R.countdownEnd) { G.state = 'play'; R.phase = 'racing'; sfx.play('bell'); } return; }
   if (G.state !== 'play') return;
   const ts = G.drawing ? 0.3 : 1;                            // slow-motion while drawing (not a freeze)
   const car = G.car;
@@ -262,6 +265,7 @@ function step(dt) {
 }
 
 function fail(title, text) {
+  if (R.on) return raceCrash(title);
   G.state = 'fail';
   sfx.play('ko');
   CG.gameplayStop();
@@ -272,6 +276,7 @@ function fail(title, text) {
 }
 
 function win() {
+  if (R.on) return raceFinish();
   G.state = 'win';
   sfx.play('win');
   CG.gameplayStop();
@@ -396,10 +401,12 @@ function draw() {
 
   if (G.car) {
     for (const w of G.wheels) { const gy = groundY(w.position.x); const h = clamp((gy - w.position.y - w.radius) / 120, 0, 1); ctx.fillStyle = `rgba(0,0,0,${(0.28 * (1 - h)).toFixed(3)})`; ctx.beginPath(); ctx.ellipse(w.position.x, gy - 2, w.radius * (1 + h * 0.4), 6 + h * 3, 0, 0, 7); ctx.fill(); }
+    if (R.on) drawGhosts();
     for (const w of G.wheels) drawWheel(w);
-    drawCar(G.car);
+    drawCar(G.car, R.on ? myColor() : '#e6452c', G.bounce);
   }
   ctx.restore();
+  if (R.on) drawRaceOverlay();
 }
 
 function drawMountains(off, baseY, period, h, col, snow, seed, n) {
@@ -468,10 +475,11 @@ function drawWheel(w) {
   ctx.restore();
 }
 
-function drawCar(c) {
-  ctx.save(); ctx.translate(c.position.x, c.position.y + G.bounce); ctx.rotate(c.angle);
+function drawCar(c, col = '#e6452c', bounce = 0) {
+  ctx.save(); ctx.translate(c.position.x, c.position.y + bounce); ctx.rotate(c.angle);
   ctx.fillStyle = '#2a2a30'; roundRect(-50, -4, 100, 14, 5); ctx.fill();                       // under-body
-  const bg = ctx.createLinearGradient(0, -14, 0, 14); bg.addColorStop(0, '#ff7a5c'); bg.addColorStop(0.5, '#e6452c'); bg.addColorStop(1, '#a52a18');
+  ctx.fillStyle = col; roundRect(-56, -13, 112, 26, 9); ctx.fill();
+  const bg = ctx.createLinearGradient(0, -14, 0, 14); bg.addColorStop(0, 'rgba(255,255,255,.38)'); bg.addColorStop(0.5, 'rgba(255,255,255,0)'); bg.addColorStop(1, 'rgba(0,0,0,.38)');
   ctx.fillStyle = bg; roundRect(-56, -13, 112, 26, 9); ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 2; roundRect(-56, -13, 112, 26, 9); ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,0.28)'; roundRect(-50, -11, 100, 5, 3); ctx.fill();          // paint highlight
@@ -489,6 +497,368 @@ function drawCar(c) {
   ctx.fillStyle = '#f2c9a0'; ctx.beginPath(); ctx.arc(-16, -40, 9, 0, 7); ctx.fill();          // driver
   ctx.fillStyle = '#2b2d42'; ctx.beginPath(); ctx.arc(-16, -41, 10, Math.PI, 0); ctx.fill();   // helmet
   ctx.fillStyle = 'rgba(120,200,255,0.75)'; roundRect(-14, -44, 10, 5, 2); ctx.fill();          // visor
+  ctx.restore();
+}
+
+
+// ------------------------------------------------------------ race mode (2–6 players online)
+const RACE_COLORS = ['#e6452c', '#2f8fe6', '#3ab54a', '#f2b01e', '#9b59b6', '#ff6fa8'];
+const RACE_MAX = 6;
+const R = {
+  on: false, role: null, net: null, code: null, myId: null, name: '', phase: 'idle',
+  players: new Map(),            // id -> { id, name, color, x, y, a, tx, ty, ta, spin, shape, prog, fin, place }
+  seed: 0, lvl: 4, countdownEnd: 0, lastSend: 0, finishOrder: [], firstFinishAt: 0, results: null, inviteUrl: null, hudT: 0,
+};
+const rid = (id) => id;
+function myColor() { const me = R.players.get(R.myId); return me ? me.color : '#e6452c'; }
+function raceStatus(msg) { $('race-status').textContent = msg || ''; }
+function inviteLink(code) {
+  const u = CG.inviteUrl(code);
+  return (u && !/your-game-will-appear-here/.test(u)) ? u : (location.origin + location.pathname + '?room=' + code);
+}
+
+function openRace(prefillCode) {
+  ['menu', 'win', 'fail', 'race-res'].forEach(id => $(id).classList.add('hidden'));
+  $('race').classList.remove('hidden');
+  $('race-setup').classList.remove('hidden');
+  $('race-room').classList.add('hidden');
+  $('race-name').value = localStorage.getItem('dw-name') || '';
+  if (prefillCode) $('race-code').value = prefillCode.toUpperCase();
+  raceStatus('');
+}
+
+function raceName() {
+  const n = ($('race-name').value || '').trim().slice(0, 12) || 'Player';
+  localStorage.setItem('dw-name', n);
+  return n;
+}
+
+function netHandlers(role) {
+  return {
+    onStatus: raceStatus,
+    onRoomOpen: (code) => {
+      R.code = code;
+      $('race-setup').classList.add('hidden'); $('race-room').classList.remove('hidden');
+      $('race-code-show').textContent = code;
+      R.inviteUrl = inviteLink(code);
+      raceStatus('Room open — share the code or the link.');
+      renderLobby();
+    },
+    onPeerJoin: (id) => { /* wait for hello */ },
+    onPeerLeave: (id) => {
+      R.players.delete(id);
+      hostBroadcastLobby();
+      raceStatus('A player left.');
+      renderLobby();
+      if (R.phase === 'racing' || R.phase === 'finished') hostMaybeFinish();
+    },
+    onConnected: () => {                                  // guest linked to host
+      R.net.send({ t: 'hello', name: R.name });
+      raceStatus('Connected — waiting for the host to start…');
+      $('race-setup').classList.add('hidden'); $('race-room').classList.remove('hidden');
+      $('race-code-show').textContent = R.code;
+      R.inviteUrl = inviteLink(R.code);
+    },
+    onData: (from, d) => handleRaceData(from, d),
+    onClose: () => { raceAbort('The host left the room.'); },
+    onError: (e) => {
+      const t = e && e.type;
+      const msg = t === 'peer-unavailable' ? 'Room not found. Check the code.' :
+                  t === 'full' ? 'That room is full (6 players).' :
+                  t === 'timeout' ? 'Could not reach the connection server. Check your internet.' :
+                  t === 'ice-failed' ? 'Network blocked the connection. Try mobile data or another Wi-Fi.' :
+                  t === 'unavailable-id' ? 'Code clash — create the room again.' : 'Connection error: ' + (e && (e.type || e.message) || 'unknown');
+      raceStatus(msg);
+      if (R.phase === 'idle' || R.phase === 'lobby') {
+        if (R.net) { R.net.close(); R.net = null; }
+        $('race-setup').classList.remove('hidden'); $('race-room').classList.add('hidden');
+        R.players.clear(); R.on = false;
+      }
+    },
+  };
+}
+
+function raceCreate() {
+  sfx.unlock();
+  R.name = raceName();
+  R.role = 'host'; R.myId = 'H'; R.on = true; R.phase = 'lobby';
+  R.players.clear();
+  R.players.set('H', mkPlayer('H', R.name, 0));
+  R.net = new RaceRoom(netHandlers('host'));
+  R.net.host(genCode(), RACE_MAX);
+  renderLobby();
+}
+
+function raceJoin(code) {
+  sfx.unlock();
+  code = (code || $('race-code').value || '').trim().toUpperCase();
+  if (code.length !== 4) { raceStatus('Enter the 4-letter room code.'); return; }
+  R.name = raceName();
+  R.role = 'guest'; R.myId = null; R.on = true; R.phase = 'lobby'; R.code = code;
+  R.players.clear();
+  R.net = new RaceRoom(netHandlers('guest'));
+  R.net.join(code);
+}
+
+function mkPlayer(id, name, colorIdx) {
+  return { id, name, color: RACE_COLORS[colorIdx % RACE_COLORS.length], x: 0, y: 0, a: 0, tx: 0, ty: 0, ta: 0, spin: 0, shape: PRESETS.circle(), prog: 0, fin: null, place: 0 };
+}
+
+function lobbyList() { return [...R.players.values()].map(p => ({ id: p.id, name: p.name, color: p.color })); }
+function hostBroadcastLobby() { if (R.role === 'host' && R.net) R.net.broadcast({ t: 'lobby', players: lobbyList(), lvl: R.lvl }); }
+
+function renderLobby() {
+  const list = $('race-players'); list.innerHTML = '';
+  for (const p of R.players.values()) {
+    const li = document.createElement('li');
+    li.innerHTML = `<i style="background:${p.color}"></i>${p.name}${p.id === R.myId ? ' (you)' : ''}${p.id === 'H' ? ' · host' : ''}`;
+    list.appendChild(li);
+  }
+  const host = R.role === 'host';
+  $('race-host-controls').classList.toggle('hidden', !host);
+  $('race-guest-note').classList.toggle('hidden', host);
+  $('btn-race-start').disabled = !(host && R.players.size >= 2);
+  $('btn-race-start').textContent = R.players.size >= 2 ? '🏁 START RACE' : 'Waiting for players…';
+  document.querySelectorAll('#race-len button').forEach(b => b.classList.toggle('on', +b.dataset.lvl === R.lvl));
+  $('race-count').textContent = `${R.players.size} / ${RACE_MAX} players`;
+}
+
+function handleRaceData(from, d) {
+  if (!d || !R.on) return;
+  const host = R.role === 'host';
+  switch (d.t) {
+    case 'hello': {                                    // host: new player announced their name
+      if (!host) return;
+      const used = new Set([...R.players.values()].map(p => p.color));
+      let idx = 0; while (idx < RACE_COLORS.length - 1 && used.has(RACE_COLORS[idx])) idx++;
+      R.players.set(from, mkPlayer(from, String(d.name || 'Player').slice(0, 12), idx));
+      R.net.sendTo(from, { t: 'you', id: from });
+      hostBroadcastLobby(); renderLobby();
+      raceStatus(`${R.players.get(from).name} joined.`);
+      if (R.phase === 'racing') R.net.sendTo(from, { t: 'spectate' });
+      break;
+    }
+    case 'you': R.myId = d.id; break;                    // guest: learn own id
+    case 'lobby': {                                      // guest: full player list from host
+      if (host) return;
+      const next = new Map();
+      for (const p of d.players) { const old = R.players.get(p.id); next.set(p.id, old ? Object.assign(old, { name: p.name, color: p.color }) : Object.assign(mkPlayer(p.id, p.name, 0), { color: p.color })); }
+      R.players = next; R.lvl = d.lvl || R.lvl; renderLobby();
+      break;
+    }
+    case 'start': if (!host) raceStart(d.seed, d.lvl); break;
+    case 's': {                                          // guest -> host position
+      if (!host) return;
+      const p = R.players.get(from); if (p) { p.tx = d.x; p.ty = d.y; p.ta = d.a; p.prog = d.p; }
+      break;
+    }
+    case 'ss': {                                         // host -> all positions
+      if (host) return;
+      for (const [id, x, y, a, prog] of d.l) { if (id === R.myId) continue; const p = R.players.get(id); if (p) { p.tx = x; p.ty = y; p.ta = a; p.prog = prog; } }
+      break;
+    }
+    case 'sh': {                                         // wheel shape changed
+      const id = host ? from : d.id;
+      const p = R.players.get(id); if (p && Array.isArray(d.pts) && d.pts.length >= 3) p.shape = d.pts.map(q => ({ x: +q[0], y: +q[1] }));
+      if (host) R.net.broadcast({ t: 'sh', id: from, pts: d.pts }, from);
+      break;
+    }
+    case 'fin': {                                        // guest finished -> host records
+      if (!host) return;
+      hostRecordFinish(from, d.time);
+      break;
+    }
+    case 'place': {                                      // host -> all: someone finished
+      if (host) return;
+      const p = R.players.get(d.id); if (p) { p.fin = d.time; p.place = d.place; }
+      if (d.id === R.myId) showFinishedBanner(d.place);
+      break;
+    }
+    case 'res': if (!host) showResults(d.list); break;
+    case 'bye': raceAbort('The host closed the room.'); break;
+  }
+}
+
+function raceStartHost() {
+  if (R.role !== 'host' || R.players.size < 2) return;
+  const seed = (Math.random() * 1e9) | 0;
+  R.net.broadcast({ t: 'start', seed, lvl: R.lvl });
+  raceStart(seed, R.lvl);
+}
+
+function raceStart(seed, lvl) {
+  R.seed = seed; R.lvl = lvl; R.finishOrder = []; R.firstFinishAt = 0; R.results = null;
+  for (const p of R.players.values()) { p.fin = null; p.place = 0; p.prog = 0; }
+  ['race', 'race-res', 'menu', 'win', 'fail'].forEach(id => $(id).classList.add('hidden'));
+  $('race-banner').classList.add('hidden');
+  $('race-hud').classList.remove('hidden');
+  G.levelNo = lvl;
+  $('hud-level').textContent = 'RACE';
+  setShape(PRESETS.circle());
+  buildWorld(lvl, seed);
+  G.camX = G.car.position.x - 420; G.camY = G.car.position.y - 430;
+  for (const p of R.players.values()) { p.x = p.tx = G.car.position.x; p.y = p.ty = G.car.position.y; p.a = p.ta = 0; p.shape = PRESETS.circle(); }
+  R.countdownEnd = performance.now() + 3200;
+  R.phase = 'countdown';
+  G.state = 'countdown';
+  sfx.unlock();
+  CG.gameplayStart();
+}
+
+function raceCrash(title) {
+  G.state = 'respawn';
+  sfx.play('ko');
+  setTimeout(() => {
+    if (!R.on || R.phase !== 'racing' || G.state !== 'respawn') return;
+    const gy = groundY(G.checkpoint);
+    spawnCar(G.checkpoint, gy - 70);
+    G.lastProgress = G.checkpoint; G.stuckT = 0; G.flipT = 0;
+    G.state = 'play';
+  }, 900);
+}
+
+function raceFinish() {
+  G.state = 'finished';
+  sfx.play('win');
+  const time = +G.time.toFixed(2);
+  if (R.role === 'host') hostRecordFinish('H', time);           // sets the banner with the place
+  else { R.net.send({ t: 'fin', time }); showFinishedBanner(0); }
+}
+
+function showFinishedBanner(place) {
+  const b = $('race-banner');
+  b.textContent = place ? `FINISHED ${ordinal(place)}! Waiting for the others…` : 'FINISHED! Waiting for the others…';
+  b.classList.remove('hidden');
+}
+const ordinal = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : (n % 10 < 4 ? n % 10 : 0)]);
+
+function hostRecordFinish(id, time) {
+  const p = R.players.get(id); if (!p || p.fin !== null) return;
+  p.fin = time; p.place = R.finishOrder.length + 1; R.finishOrder.push(id);
+  if (!R.firstFinishAt) R.firstFinishAt = performance.now();
+  R.net.broadcast({ t: 'place', id, time, place: p.place });
+  if (id === 'H') showFinishedBanner(p.place);
+  hostMaybeFinish();
+}
+
+function hostMaybeFinish() {
+  if (R.role !== 'host' || R.phase !== 'racing' && R.phase !== 'finished') return;
+  const all = [...R.players.values()];
+  const done = all.every(p => p.fin !== null);
+  const timeout = R.firstFinishAt && performance.now() - R.firstFinishAt > 30000;
+  if (!done && !timeout) return;
+  const list = all.sort((a, b) => (a.fin === null) - (b.fin === null) || (a.place || 99) - (b.place || 99) || b.prog - a.prog)
+    .map((p, i) => ({ id: p.id, name: p.name, color: p.color, time: p.fin, place: p.fin !== null ? p.place : null, prog: Math.round(p.prog * 100) }));
+  R.net.broadcast({ t: 'res', list });
+  showResults(list);
+}
+
+function showResults(list) {
+  R.phase = 'results'; G.state = 'results';
+  $('race-banner').classList.add('hidden');
+  CG.gameplayStop();
+  const ol = $('race-res-list'); ol.innerHTML = '';
+  const medals = ['🥇', '🥈', '🥉'];
+  list.forEach((p, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="pl">${p.place ? medals[p.place - 1] || p.place + '.' : '—'}</span><i style="background:${p.color}"></i><span class="nm">${p.name}${p.id === R.myId ? ' (you)' : ''}</span><span class="tm">${p.time !== null ? p.time.toFixed(2) + 's' : 'DNF · ' + p.prog + '%'}</span>`;
+    ol.appendChild(li);
+  });
+  const me = list.find(p => p.id === R.myId);
+  $('race-res-title').textContent = me && me.place === 1 ? 'YOU WIN!' : me && me.place ? ordinal(me.place).toUpperCase() + ' PLACE' : 'RACE OVER';
+  $('btn-race-again').classList.toggle('hidden', R.role !== 'host');
+  $('race-res-wait').classList.toggle('hidden', R.role === 'host');
+  $('race-res').classList.remove('hidden');
+  $('race-hud').classList.add('hidden');
+  if (R.role === 'host') CG.midgameAd(sfx, () => {});
+}
+
+function raceAgain() {
+  if (R.role !== 'host') return;
+  R.phase = 'lobby';
+  raceStartHost();
+}
+
+function raceAbort(msg) {
+  const wasOn = R.on;
+  raceLeave(true);
+  if (wasOn) { openRace(); raceStatus(msg); }
+}
+
+function raceLeave(silent) {
+  if (R.net) { if (R.role === 'host') R.net.broadcast({ t: 'bye' }); R.net.close(); R.net = null; }
+  R.on = false; R.phase = 'idle'; R.role = null; R.myId = null; R.players.clear();
+  ['race', 'race-res', 'race-hud', 'race-banner'].forEach(id => $(id).classList.add('hidden'));
+  CG.gameplayStop();
+  if (!silent) { G.state = 'menu'; $('menu').classList.remove('hidden'); }
+  else G.state = 'menu';
+}
+
+function raceSendShape() {
+  if (!R.on || !R.net) return;
+  const pts = G.shape.map(q => [Math.round(q.x * 10) / 10, Math.round(q.y * 10) / 10]);
+  const me = R.players.get(R.myId); if (me) me.shape = G.shape;
+  if (R.role === 'host') R.net.broadcast({ t: 'sh', id: 'H', pts });
+  else R.net.send({ t: 'sh', pts });
+}
+
+function raceTick(now) {
+  if (!R.net || (R.phase !== 'racing' && R.phase !== 'countdown' && R.phase !== 'finished')) return;
+  // smooth the ghosts toward their last known position
+  for (const p of R.players.values()) {
+    if (p.id === R.myId) continue;
+    const dx = p.tx - p.x;
+    p.x += dx * 0.3; p.y += (p.ty - p.y) * 0.3; p.a += (p.ta - p.a) * 0.3;
+    p.spin += dx * 0.3 / 26;
+  }
+  if (now - R.lastSend < 50) return;
+  R.lastSend = now;
+  const car = G.car; if (!car) return;
+  const prog = clamp(car.position.x / G.level.finishX, 0, 1);
+  const me = R.players.get(R.myId);
+  if (me) { me.x = me.tx = car.position.x; me.y = me.ty = car.position.y; me.a = me.ta = car.angle; me.prog = prog; }
+  if (R.role === 'host') {
+    const l = [...R.players.values()].map(p => [p.id, Math.round(p.tx), Math.round(p.ty), +p.ta.toFixed(3), +p.prog.toFixed(3)]);
+    R.net.broadcast({ t: 'ss', l });
+    if (R.phase === 'racing' || R.phase === 'finished') hostMaybeFinish();
+  } else {
+    R.net.send({ t: 's', x: Math.round(car.position.x), y: Math.round(car.position.y), a: +car.angle.toFixed(3), p: +prog.toFixed(3) });
+  }
+  // standings HUD (every send tick)
+  const ranked = [...R.players.values()].sort((a, b) => (a.fin === null) - (b.fin === null) || (a.place || 99) - (b.place || 99) || b.prog - a.prog);
+  $('race-hud').innerHTML = ranked.map((p, i) => `<div${p.id === R.myId ? ' class="me"' : ''}><i style="background:${p.color}"></i>${i + 1}. ${p.name} <b>${p.fin !== null ? '🏁' : Math.round(p.prog * 100) + '%'}</b></div>`).join('');
+}
+
+function drawGhosts() {
+  for (const p of R.players.values()) {
+    if (p.id === R.myId) continue;
+    const r = wheelRadius(p.shape);
+    ctx.save(); ctx.globalAlpha = 0.62;
+    const cs = Math.cos(p.a), sn = Math.sin(p.a);
+    for (const off of [-50, 50]) {
+      const wx = p.x + off * cs - 6 * sn, wy = p.y + off * sn + 6 * cs;
+      drawWheel({ position: { x: wx, y: wy }, angle: p.spin, shape: p.shape, radius: r });
+    }
+    drawCar({ position: { x: p.x, y: p.y }, angle: p.a }, p.color, 0);
+    ctx.restore();
+    ctx.font = 'bold 15px Verdana, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(p.name, p.x, p.y - 64);
+    ctx.fillStyle = p.color; ctx.fillText(p.name, p.x, p.y - 64);
+  }
+}
+
+function drawRaceOverlay() {
+  if (R.phase !== 'countdown') return;
+  const left = (R.countdownEnd - performance.now()) / 1000;
+  const n = Math.ceil(left);
+  const label = n > 0 ? String(n) : 'GO!';
+  const frac = left - Math.floor(left);
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `bold ${Math.round(150 + frac * 60)}px Impact, "Arial Black", sans-serif`;
+  ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.strokeText(label, W / 2, H / 2 - 40);
+  ctx.fillStyle = n > 0 ? '#ffe27a' : '#7ef0b0'; ctx.fillText(label, W / 2, H / 2 - 40);
+  ctx.font = 'bold 26px Verdana, sans-serif'; ctx.lineWidth = 5; ctx.strokeText('Draw your wheels, get ready!', W / 2, H / 2 + 70);
+  ctx.fillStyle = '#fff'; ctx.fillText('Draw your wheels, get ready!', W / 2, H / 2 + 70);
   ctx.restore();
 }
 
@@ -534,6 +904,21 @@ window.addEventListener('keyup', () => { G.lean = 0; });
 
 // ------------------------------------------------------------ UI wiring
 $('btn-play').addEventListener('click', () => startLevel(G.best));
+$('btn-race').addEventListener('click', () => openRace());
+$('btn-race-create').addEventListener('click', () => raceCreate());
+$('btn-race-join').addEventListener('click', () => raceJoin());
+$('race-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') raceJoin(); });
+$('btn-race-start').addEventListener('click', () => raceStartHost());
+$('btn-race-leave').addEventListener('click', () => raceLeave());
+$('btn-race-back').addEventListener('click', () => raceLeave());
+$('btn-race-again').addEventListener('click', () => raceAgain());
+$('btn-race-res-leave').addEventListener('click', () => raceLeave());
+$('btn-race-copy').addEventListener('click', async () => {
+  const url = R.inviteUrl || (location.origin + location.pathname + '?room=' + R.code);
+  try { if (navigator.share) await navigator.share({ title: 'Doodle Wheels race', text: 'Race me in Doodle Wheels! Room ' + R.code, url }); else { await navigator.clipboard.writeText(url); raceStatus('Invite link copied!'); } }
+  catch (e) { raceStatus('Link: ' + url); }
+});
+document.querySelectorAll('#race-len button').forEach(b => b.addEventListener('click', () => { if (R.role !== 'host') return; R.lvl = +b.dataset.lvl; hostBroadcastLobby(); renderLobby(); }));
 $('btn-next').addEventListener('click', () => CG.midgameAd(sfx, () => startLevel(G.levelNo + 1)));
 $('btn-retry').addEventListener('click', () => CG.midgameAd(sfx, respawn));
 $('btn-skip').addEventListener('click', () => CG.rewardedAd(sfx, () => startLevel(G.levelNo + 1), () => {}));
@@ -543,6 +928,7 @@ $('btn-mute').addEventListener('click', () => { localStorage.setItem('dw-mute', 
 renderMute();
 drawPadShape();
 CG.init();
+{ const room = CG.inviteParam() || new URLSearchParams(location.search).get('room'); if (room && /^[A-Z0-9]{4}$/i.test(room)) { openRace(room); } }
 
 // ------------------------------------------------------------ main loop
 let last = performance.now();
@@ -550,9 +936,10 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.033, (now - last) / 1000); last = now;
   step(dt);
+  if (R.on) raceTick(now);
   if (G.state !== 'play') sfx.engineStop();
   draw();
 }
 requestAnimationFrame(frame);
 
-window.__dw = { G, step, startLevel, setShape, PRESETS, respawn, draw };
+window.__dw = { G, R, step, startLevel, setShape, PRESETS, respawn, draw, openRace, raceCreate, raceJoin, raceStartHost, raceLeave, raceTick };

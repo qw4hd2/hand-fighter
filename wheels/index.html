@@ -40,6 +40,7 @@
       <div>⭐ mud → spiky</div><div>✚ water → paddles</div>
     </div>
     <button id="btn-play" class="big">▶ PLAY</button>
+    <button id="btn-race" class="big race">🏁 RACE FRIENDS</button>
     <p class="small">Draw in the pad (bottom-left) any time — even while driving. Tap the left / right side of the screen to lean.</p>
   </div>
 
@@ -48,6 +49,44 @@
     <div id="stars">★★★</div>
     <p id="win-time"></p>
     <button id="btn-next" class="big">NEXT LEVEL ▶</button>
+  </div>
+
+  <div id="race-hud" class="hidden"></div>
+  <div id="race-banner" class="hidden"></div>
+
+  <div id="race" class="overlay hidden">
+    <h2>RACE FRIENDS</h2>
+    <p class="tag">Same track, 2 to 6 players, first to the flag wins. Everyone draws their own wheels.</p>
+    <div id="race-setup">
+      <label class="field">Your name <input id="race-name" maxlength="12" placeholder="Player" autocomplete="off"></label>
+      <div class="row">
+        <button id="btn-race-create" class="big">CREATE ROOM</button>
+        <span class="or">or</span>
+        <input id="race-code" maxlength="4" placeholder="CODE" autocapitalize="characters" autocomplete="off">
+        <button id="btn-race-join" class="big">JOIN</button>
+      </div>
+    </div>
+    <div id="race-room" class="hidden">
+      <div class="code">Room <b id="race-code-show">----</b></div>
+      <button id="btn-race-copy" class="small-btn">🔗 Share invite link</button>
+      <div id="race-count" class="small"></div>
+      <ul id="race-players"></ul>
+      <div id="race-host-controls">
+        <div id="race-len" class="row"><span class="small">Track:</span><button data-lvl="2">Short</button><button data-lvl="4" class="on">Medium</button><button data-lvl="6">Long</button></div>
+        <button id="btn-race-start" class="big" disabled>Waiting for players…</button>
+      </div>
+      <p id="race-guest-note" class="small hidden">The host starts the race when everyone is in.</p>
+    </div>
+    <p id="race-status" class="small"></p>
+    <div class="row"><button id="btn-race-leave" class="small-btn">Leave room</button><button id="btn-race-back" class="small-btn">← Menu</button></div>
+  </div>
+
+  <div id="race-res" class="overlay hidden">
+    <h2 id="race-res-title">RESULTS</h2>
+    <ol id="race-res-list"></ol>
+    <button id="btn-race-again" class="big">↻ RACE AGAIN</button>
+    <p id="race-res-wait" class="small">Waiting for the host to start the next race…</p>
+    <button id="btn-race-res-leave" class="small-btn">Leave</button>
   </div>
 
   <div id="fail" class="overlay hidden">
@@ -60,6 +99,7 @@
 
 <script src="lib/decomp.min.js"></script>
 <script src="lib/matter.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>
