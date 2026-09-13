@@ -1,0 +1,2 @@
+{ "name": "Zada Games", "short_name": "Zada Games", "start_url": "/", "display": "standalone", "background_color": "#0d0d1c", "theme_color": "#1a1230",
+  "icons": [ { "src": "assets/site/icon-192.png", "sizes": "192x192", "type": "image/png" }, { "src": "assets/site/logo-mark.png", "sizes": "512x512", "type": "image/png" } ] }

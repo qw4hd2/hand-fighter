@@ -163,3 +163,10 @@ footer p { margin-bottom: 8px; }
 .foot a { color: #cfcbe0; text-decoration: none; display: block; font-size: 14px; margin-bottom: 6px; }
 .foot a:hover { color: #fff; }
 .foot .legal { max-width: 900px; margin: 26px auto 0; font-size: 13px; opacity: .6; text-align: center; }
+
+/* logo */
+.brand { display: inline-flex; align-items: center; gap: 9px; }
+.brand-mark { width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
+.hero-logo { margin: 0 auto 6px; max-width: 700px; }
+.hero-logo img { width: 100%; height: auto; display: block; filter: drop-shadow(0 10px 30px rgba(255, 120, 60, .25)); }
+.motto { font-family: Impact, "Arial Black", sans-serif; letter-spacing: 4px; text-transform: uppercase; font-size: clamp(14px, 2.4vw, 18px); color: #ffd166; opacity: .9; }
